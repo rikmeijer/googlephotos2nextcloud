@@ -1,0 +1,21 @@
+{
+    "name": "rikmeijer/googlephotos2nextcloud",
+    "description": "Tool to import Google Photos Takeout into Nextcloud",
+    "type": "project",
+    "require": {
+        "sabre/dav": "^4.7",
+        "amphp/parallel": "^2.3"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Rikmeijer\\Googlephotos2nextcloud\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Rik Meijer",
+            "email": "hello@rikmeijer.nl"
+        }
+    ]
+}
