@@ -3,7 +3,7 @@
     "description": "Tool to import Google Photos Takeout into Nextcloud",
     "type": "project",
     "require": {
-        "php": "8.4",
+        "php": "^8.4",
         "sabre/dav": "^4.7",
         "amphp/parallel": "^2.3"
     },
