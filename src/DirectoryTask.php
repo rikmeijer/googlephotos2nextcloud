@@ -80,11 +80,19 @@ readonly class DirectoryTask implements Task {
                 }
             }
 
-            if ($is_album) {
-                IO::write('Copying to album "' . $directory_name . '"');
-                $client->request('COPY', $photo_remote_filename, headers: [
-                    'Destination' => $this->albums_base_path . '/' . $directory_name . '/' . $photo_filename
-                ]);
+            if ($is_album === false) {
+                
+            } else {
+                $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
+                IO::write('Photo must be in album ' . $album_path);
+                if ($client->request('HEAD', $album_path . '/' . rawurlencode($photo_filename))['statusCode'] === 404) {
+                    IO::write('Copying to album "' . $directory_name . '"');
+                    $client->request('COPY', $photo_remote_filename, headers: [
+                        'Destination' => $album_path . '/' . rawurlencode($photo_filename)
+                    ]);
+                } else {
+                    IO::write('Already in album "' . $directory_name . '"');
+                }
             }
         }
 
