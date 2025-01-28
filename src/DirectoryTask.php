@@ -15,8 +15,7 @@ readonly class DirectoryTask implements Task {
             private array $user_albums,
             private string $nextcloud_url,
             private string $nextcloud_user,
-            private string $nextcloud_password,
-            private \Closure $check_remote_dir
+            private string $nextcloud_password
     ) {
 
     }
@@ -53,7 +52,7 @@ readonly class DirectoryTask implements Task {
             $photo_taken = new \DateTimeImmutable('@' . $photo_takentime_data['timestamp']);
 
 
-            $directory_remote_path = call_user_func($this->check_remote_dir, $client, $this->files_base_path, $photo_taken->format('/Y/m'));
+            $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
             if ($directory_remote_path === false) {
                 continue;
             }
