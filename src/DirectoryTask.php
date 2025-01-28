@@ -15,7 +15,8 @@ readonly class DirectoryTask implements Task {
             private array $user_albums,
             private string $nextcloud_url,
             private string $nextcloud_user,
-            private string $nextcloud_password
+            private string $nextcloud_password,
+            private \Closure $check_remote_dir
     ) {
 
     }
@@ -51,24 +52,15 @@ readonly class DirectoryTask implements Task {
             $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
             $photo_taken = new \DateTimeImmutable('@' . $photo_takentime_data['timestamp']);
 
-            $remote_name = $this->files_base_path;
 
-            $remote_path = $photo_taken->format('Y/m');
-            $directory_remote_head = $client->request('HEAD', $remote_name . '/' . $remote_path);
-            if ($directory_remote_head['statusCode'] === 404) {
-                foreach (explode('/', $remote_path) as $remote_path_part) {
-                    $remote_name .= '/' . $remote_path_part;
-                    IO::write('Creating directory "' . str_replace($this->files_base_path, '', $remote_name) . '" remotely');
-                    $client->request('MKCOL', $remote_name);
-                }
-            } else {
-                IO::write('Directory "/' . $remote_path . '" already exists');
+            $directory_remote_path = call_user_func($this->check_remote_dir, $client, $this->files_base_path, $photo_taken->format('/Y/m'));
+            if ($directory_remote_path === false) {
+                continue;
             }
-
 
             $photo_filename = basename($photo_json, ".json");
             $photo_path = $this->path . '/' . $photo_filename;
-            $photo_remote_filename = $remote_name . '/' . rawurlencode($photo_filename);
+            $photo_remote_filename = $directory_remote_path . '/' . rawurlencode($photo_filename);
 
             $file_remote_head = $client->request('HEAD', $photo_remote_filename);
             $upload = true;
