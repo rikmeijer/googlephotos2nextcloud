@@ -48,7 +48,8 @@ readonly class DirectoryTask implements Task {
         IO::write('Found ' . count($photo_jsons) . ' photo data files');
         foreach ($photo_jsons as $photo_json) {
             $photo_metadata = IO::readJson($photo_json);
-            $photo_taken = new \DateTimeImmutable('@' . $photo_metadata['photoTakenTime']['timestamp']);
+            $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
+            $photo_taken = new \DateTimeImmutable('@' . $photo_takentime_data['timestamp']);
 
             $remote_name = $this->files_base_path;
 
