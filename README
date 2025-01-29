@@ -14,3 +14,7 @@ php gp2nc.php <NEXTCLOUD_URL>
 docker build . -t gp2nc
 docker run --rm -v "/path/to/Takeout/Google Photos":/photos gp2nc <NEXTCLOUD_URL>
 ```
+
+# If you like this tool
+
+Donations are welcome: [Lightning](https://getalby.com/p/rik0) • [PayPal](https://www.paypal.com/donate/?hosted_button_id=B3WRGUUNZVDCL)
