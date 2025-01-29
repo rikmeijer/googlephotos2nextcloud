@@ -73,7 +73,7 @@ readonly class DirectoryTask implements Task {
                 IO::write('Same file size, skipping');
             } else {
                 IO::write('Uploading "' . $photo_filename . '" to "' . str_replace($this->files_base_path, '', $photo_remote_filename) . '"');
-                $response = $client->request('PUT', $photo_remote_filename, file_get_contents($photo_path));
+                $response = $client->request('PUT', $photo_remote_filename, fopen($photo_path, 'r'));
 
                 if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
                     IO::write('Failed');
