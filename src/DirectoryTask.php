@@ -37,6 +37,7 @@ readonly class DirectoryTask implements Task {
         $json_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json'));
         $metadata_jsons = array_filter($json_files, fn(string $p) => str_ends_with($p, 'metadata.json'));
         $photo_jsons = array_filter($json_files, fn(string $p) => str_ends_with($p, 'metadata.json') === false);
+        $photo_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json') === false);
 
         if (count($metadata_jsons) === 0) {
             IO::write('No metadata found');
@@ -45,23 +46,30 @@ readonly class DirectoryTask implements Task {
         }
 
 
-        IO::write('Found ' . count($photo_jsons) . ' photo data files');
-        foreach ($photo_jsons as $photo_json) {
-            $photo_metadata = IO::readJson($photo_json);
-            $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
-            $photo_taken = new \DateTimeImmutable('@' . $photo_takentime_data['timestamp']);
-
+        IO::write('Found ' . count($photo_jsons) . ' photo files');
+        foreach ($photo_files as $photo_path) {
+            $exif = @exif_read_data($photo_path);
+            if (isset($exif['DateTimeOriginal'])) {
+                $photo_taken_datetime = $exif['DateTimeOriginal'];
+            } elseif (is_file($photo_path . '.json') !== false) {
+                $photo_metadata = IO::readJson($photo_path . '.json');
+                $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
+                $photo_taken_datetime = '@' . $photo_takentime_data['timestamp'];
+            } else {
+                $photo_taken_datetime = filemtime($photo_path);
+            }
+            $photo_taken = new \DateTimeImmutable($photo_taken_datetime);
 
             $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
             if ($directory_remote_path === false) {
                 continue;
             }
 
-            $photo_filename = basename($photo_json, ".json");
-            $photo_path = $this->path . '/' . $photo_filename;
-            $photo_remote_filename = $directory_remote_path . '/' . rawurlencode($photo_filename);
+            $photo_filename = basename($photo_path);
+            $photo_remote_filename = rawurlencode($photo_filename);
+            $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
 
-            $file_remote_head = $client->request('HEAD', $photo_remote_filename);
+            $file_remote_head = $client->request('HEAD', $photo_remote_path);
             $upload = true;
             if ($file_remote_head['statusCode'] === 200) {
                 IO::write('Remote file already exists');
@@ -72,8 +80,8 @@ readonly class DirectoryTask implements Task {
             if ($upload === false) {
                 IO::write('Same file size, skipping');
             } else {
-                IO::write('Uploading "' . $photo_filename . '" to "' . str_replace($this->files_base_path, '', $photo_remote_filename) . '"');
-                $response = $client->request('PUT', $photo_remote_filename, fopen($photo_path, 'r'));
+                IO::write('Uploading "' . $photo_filename . '" to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
+                $response = $client->request('PUT', $photo_remote_path, fopen($photo_path, 'w+'));
 
                 if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
                     IO::write('Failed');
@@ -85,10 +93,10 @@ readonly class DirectoryTask implements Task {
             } else {
                 $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
                 IO::write('Photo must be in album ' . $album_path);
-                if ($client->request('HEAD', $album_path . '/' . rawurlencode($photo_filename))['statusCode'] === 404) {
+                if ($client->request('HEAD', $album_path . '/' . $photo_remote_filename)['statusCode'] === 404) {
                     IO::write('Copying to album "' . $directory_name . '"');
-                    $client->request('COPY', $photo_remote_filename, headers: [
-                        'Destination' => $album_path . '/' . rawurlencode($photo_filename)
+                    $client->request('COPY', $photo_remote_path, headers: [
+                        'Destination' => $album_path . '/' . $photo_remote_filename
                     ]);
                 } else {
                     IO::write('Already in album "' . $directory_name . '"');
