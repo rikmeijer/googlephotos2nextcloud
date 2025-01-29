@@ -104,6 +104,7 @@ readonly class DirectoryTask implements Task {
             }
         }
 
+        mkdir($this->path . '/.migrated');
         return 'done';
     }
 }

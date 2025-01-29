@@ -85,6 +85,8 @@ $executions = [];
 foreach (glob(WORKING_DIRECTORY . '/*') as $path) {
     if (is_dir($path) === false) {
         continue;
+    } elseif (is_dir($path . '/.migrated')) {
+        continue;
     }
 
     // FetchTask is just an example, you'll have to implement
