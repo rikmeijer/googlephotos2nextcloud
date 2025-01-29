@@ -65,7 +65,7 @@ readonly class DirectoryTask implements Task {
             $upload = true;
             if ($file_remote_head['statusCode'] === 200) {
                 IO::write('Remote file already exists');
-                $remote_size = $file_remote_head['headers']['content-length'][0];
+                $remote_size = $file_remote_head['headers']['content-length'][0] ?? null;
                 $upload = filesize($photo_path) !== (int) $remote_size;
             }
 
