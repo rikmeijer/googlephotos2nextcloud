@@ -4,6 +4,7 @@
     "type": "project",
     "require": {
         "php": "^8.4",
+        "ext-exif": "*",
         "sabre/dav": "^4.7",
         "amphp/parallel": "^2.3"
     },

@@ -3,6 +3,7 @@ FROM php:8.4-cli
 RUN ["apt", "update"]
 RUN ["apt-get", "install", "-y", "libzip-dev", "zip"]
 
+RUN ["docker-php-ext-install", "exif"]
 RUN ["docker-php-ext-install", "zip"]
 
 WORKDIR "/app"
