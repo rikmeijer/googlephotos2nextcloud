@@ -57,7 +57,7 @@ readonly class DirectoryTask implements Task {
                 $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
                 $photo_taken_datetime = '@' . $photo_takentime_data['timestamp'];
             } else {
-                $photo_taken_datetime = filemtime($photo_path);
+                $photo_taken_datetime = '@' . filemtime($photo_path);
             }
             try {
                 $photo_taken = new \DateTimeImmutable($photo_taken_datetime);
@@ -96,9 +96,7 @@ readonly class DirectoryTask implements Task {
                 }
             }
 
-            if ($is_album === false) {
-                
-            } else {
+            if ($is_album) {
                 $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
                 IO::write('Photo must be in album ' . $album_path);
                 if ($client->request('HEAD', $album_path . '/' . $photo_remote_filename)['statusCode'] === 404) {
