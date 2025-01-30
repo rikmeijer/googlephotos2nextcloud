@@ -14,9 +14,9 @@ php gp2nc.php <NEXTCLOUD_URL>
 docker build . -t gp2nc
 docker run --rm -v "/path/to/Takeout/Google Photos":/photos gp2nc <NEXTCLOUD_URL>
 ```
-or use ready2use image (auto-build; amd64 only)
+or use ready2use image (auto-build)
 ```
-docker run ghcr.io/rikmeijer/googlephotos2nextcloud:latest --rm  -v "/path/to/Takeout/Google Photos":/photos <NEXTCLOUD_URL>
+docker run --rm -v "/path/to/Takeout/Google Photos":/photos ghcr.io/rikmeijer/googlephotos2nextcloud:latest <NEXTCLOUD_URL>
 ```
 
 # If you like this tool
