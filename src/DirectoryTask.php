@@ -48,6 +48,7 @@ readonly class DirectoryTask implements Task {
 
         IO::write('Found ' . count($photo_jsons) . ' photo files');
         foreach ($photo_files as $photo_path) {
+            $photo_filename = basename($photo_path);
             $exif = @exif_read_data($photo_path);
             if (isset($exif['DateTimeOriginal'])) {
                 $photo_taken_datetime = $exif['DateTimeOriginal'];
@@ -58,14 +59,18 @@ readonly class DirectoryTask implements Task {
             } else {
                 $photo_taken_datetime = filemtime($photo_path);
             }
-            $photo_taken = new \DateTimeImmutable($photo_taken_datetime);
+            try {
+                $photo_taken = new \DateTimeImmutable($photo_taken_datetime);
+            } catch (\DateMalformedStringException $e) {
+                IO::write($photo_filename . ' has a improper' . ($exif !== false ? ' exif' : '') . ' taken datetime: ' . $photo_taken_datetime);
+                continue;
+            }
 
             $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
             if ($directory_remote_path === false) {
                 continue;
             }
 
-            $photo_filename = basename($photo_path);
             $photo_remote_filename = rawurlencode($photo_filename);
             $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
 
