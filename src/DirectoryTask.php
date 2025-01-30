@@ -62,7 +62,7 @@ readonly class DirectoryTask implements Task {
             try {
                 $photo_taken = new \DateTimeImmutable($photo_taken_datetime);
             } catch (\DateMalformedStringException $e) {
-                IO::write($photo_filename . ' has a improper' . ($exif !== false ? ' exif' : '') . ' taken datetime: ' . $photo_taken_datetime . ', trying as Unix timestamp');
+                IO::write($photo_filename . ' has a improper' . (isset($exif['DateTimeOriginal']) ? ' exif' : '') . ' taken datetime: ' . $photo_taken_datetime . ', trying as Unix timestamp');
                 if (is_numeric($photo_taken_datetime) === false) {
                     exit('Failed ' . $photo_filename, ' please fix take datetime and restart');
                 }
