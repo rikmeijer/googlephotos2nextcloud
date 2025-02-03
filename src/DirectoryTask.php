@@ -62,10 +62,13 @@ readonly class DirectoryTask implements Task {
                 $photo_taken = new \DateTimeImmutable($photo_taken_datetime);
             } catch (\DateMalformedStringException $e) {
                 IO::write($photo_filename . ' has a improper' . (isset($exif['DateTimeOriginal']) ? ' exif' : '') . ' taken datetime: ' . $photo_taken_datetime . ', trying as Unix timestamp');
-                if (is_numeric($photo_taken_datetime) === false) {
+                if (is_numeric($photo_taken_datetime)) {
+                    $photo_taken = new \DateTimeImmutable('@' . $photo_taken_datetime);
+                } elseif (preg_match('/\d+\-\d+\-\d+_\d+:\d+:\d+/', $subject) === 1) {
+                    $photo_taken = \DateTimeImmutable::createFromFormat('Y-m-d_G:i:s', $photo_taken_datetime);
+                } else {
                     exit('Failed ' . $photo_filename . ' please fix take datetime and restart');
                 }
-                $photo_taken = new \DateTimeImmutable('@' . $photo_taken_datetime);
             }
 
             $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
