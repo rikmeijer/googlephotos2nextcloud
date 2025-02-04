@@ -64,7 +64,7 @@ readonly class DirectoryTask implements Task {
                 IO::write($photo_filename . ' has a improper' . (isset($exif['DateTimeOriginal']) ? ' exif' : '') . ' taken datetime: ' . $photo_taken_datetime . ', trying as Unix timestamp');
                 if (is_numeric($photo_taken_datetime)) {
                     $photo_taken = new \DateTimeImmutable('@' . $photo_taken_datetime);
-                } elseif (preg_match('/\d+\-\d+\-\d+_\d+:\d+:\d+/', $subject) === 1) {
+                } elseif (preg_match('/\d+\-\d+\-\d+_\d+:\d+:\d+/', $photo_taken_datetime) === 1) {
                     $photo_taken = \DateTimeImmutable::createFromFormat('Y-m-d_G:i:s', $photo_taken_datetime);
                 } else {
                     exit('Failed ' . $photo_filename . ' please fix take datetime and restart');
