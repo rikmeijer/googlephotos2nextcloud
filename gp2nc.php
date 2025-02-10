@@ -8,16 +8,19 @@ use Amp\Future;
 use Amp\Parallel\Worker;
 use Amp\Parallel\Worker\ContextWorkerPool;
 
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->safeLoad();
+
 define('WORKING_DIRECTORY', getcwd());
 if (WORKING_DIRECTORY === false) {
     exit('Could not determine current working directory');
 }
 IO::write('Working from ' . WORKING_DIRECTORY);
 
-if ($_SERVER['argc'] < 2) {
-    exit('Nextcloud URL missing');
+if (isset($_ENV['NEXTCLOUD_URL']) === false) {
+    exit('Nextcloud URL missing, please set in .env or as environment variable');
 }
-$parsed_url = parse_url($_SERVER['argv'][1]);
+$parsed_url = parse_url($_ENV['NEXTCLOUD_URL']);
 
 $origin = [$parsed_url['scheme'] . '://', $parsed_url['host']];
 if (isset($parsed_url['port'])) {

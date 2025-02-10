@@ -4,19 +4,22 @@ Replace NEXTCLOUD_URL with the following: https://<USER>:<APP_PASSWORD>@nextclou
 --> /Photos can be any path in Nextcloud to import photos to
 
 # Run from command line (in /path/to/Takout/Google Photos, where photo directories and jsons are residing)
+```.env
+NEXTCLOUD_URL=<NEXTCLOUD_URL>
 ```
-php gp2nc.php <NEXTCLOUD_URL>
+```
+php gp2nc.php 
 ```
 
 # Run with docker
 
 ```
 docker build . -t gp2nc
-docker run --rm -v "/path/to/Takeout/Google Photos":/photos gp2nc <NEXTCLOUD_URL>
+docker run --rm -v "/path/to/Takeout/Google Photos":/photos gp2nc -e NEXTLCOUD_URL=<NEXTCLOUD_URL>
 ```
 or use ready2use image (auto-build)
 ```
-docker run --rm -v "/path/to/Takeout/Google Photos":/photos ghcr.io/rikmeijer/googlephotos2nextcloud:latest <NEXTCLOUD_URL>
+docker run --rm -v "/path/to/Takeout/Google Photos":/photos ghcr.io/rikmeijer/googlephotos2nextcloud:latest  -e NEXTLCOUD_URL=<NEXTCLOUD_URL>
 ```
 
 # If you like this tool

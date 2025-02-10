@@ -6,7 +6,8 @@
         "php": "^8.4",
         "ext-exif": "*",
         "sabre/dav": "^4.7",
-        "amphp/parallel": "^2.3"
+        "amphp/parallel": "^2.3",
+        "vlucas/phpdotenv": "^5.6"
     },
     "license": "MIT",
     "autoload": {
