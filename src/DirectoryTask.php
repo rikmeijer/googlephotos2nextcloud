@@ -83,13 +83,12 @@ readonly class DirectoryTask implements Task {
             $file_remote_head = $client->request('HEAD', $photo_remote_path);
             $upload = true;
             if ($file_remote_head['statusCode'] === 200) {
-                IO::write('Remote file already exists');
                 $remote_size = $file_remote_head['headers']['content-length'][0] ?? null;
                 $upload = filesize($photo_path) !== (int) $remote_size;
             }
 
             if ($upload === false) {
-                IO::write('Same file size, skipping');
+                IO::write('Remote file already exists and same file size, skipping');
             } else {
                 IO::write('Uploading "' . $photo_filename . '" to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
                 $response = $client->request('PUT', $photo_remote_path, fopen($photo_path, 'r+'));
@@ -99,17 +98,19 @@ readonly class DirectoryTask implements Task {
                 }
             }
 
-            if ($is_album) {
-                $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
-                IO::write('Photo must be in album ' . $album_path);
-                if ($client->request('HEAD', $album_path . '/' . $photo_remote_filename)['statusCode'] === 404) {
-                    IO::write('Copying to album "' . $directory_name . '"');
-                    $client->request('COPY', $photo_remote_path, headers: [
-                        'Destination' => $album_path . '/' . $photo_remote_filename
-                    ]);
-                } else {
-                    IO::write('Already in album "' . $directory_name . '"');
-                }
+            if ($is_album === false) {
+                continue;
+            }
+
+            $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
+            IO::write('Photo must be in album ' . $album_path);
+            if ($client->request('HEAD', $album_path . '/' . $photo_remote_filename)['statusCode'] !== 404) {
+                IO::write('Already in album "' . $directory_name . '"');
+            } else {
+                IO::write('Copying to album "' . $directory_name . '"');
+                $client->request('COPY', $photo_remote_path, headers: [
+                    'Destination' => $album_path . '/' . $photo_remote_filename
+                ]);
             }
         }
 
