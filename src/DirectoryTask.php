@@ -25,7 +25,8 @@ readonly class DirectoryTask implements Task {
         $client = new \Sabre\DAV\Client([
             'baseUri' => $this->nextcloud_url . '/remote.php/dav',
             'userName' => $this->nextcloud_user,
-            'password' => $this->nextcloud_password
+            'password' => $this->nextcloud_password,
+            'authType' => \Sabre\DAV\Client::AUTH_BASIC
         ]);
 
         $directory_name = basename($this->path);
