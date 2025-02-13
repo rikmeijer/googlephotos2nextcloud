@@ -83,22 +83,34 @@ readonly class DirectoryTask implements Task {
             $photo_remote_filename = rawurlencode($photo_filename);
             $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
 
-            $file_remote_head = $client->request('HEAD', $photo_remote_path);
+            $file_remote_props = $client->propFind($photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
+
             $upload = true;
-            if ($file_remote_head['statusCode'] === 200) {
-                $remote_size = $file_remote_head['headers']['content-length'][0] ?? null;
+            if (count($file_remote_props) > 0) {
+                $remote_size = $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
                 $upload = filesize($photo_path) !== (int) $remote_size;
+                $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
             }
 
-            if ($upload === false) {
-                IO::write('Remote file already exists and same file size, skipping');
-            } else {
+            if ($upload) {
                 IO::write('Uploading "' . $photo_filename . '" to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
                 $response = $client->request('PUT', $photo_remote_path, fopen($photo_path, 'r+'));
-
+                
                 if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
                     IO::write('Failed');
                 }
+
+                $file_id = $response['oc-fileid'];
+                $file_remote_head_check = $client->request('HEAD', $photo_remote_path);
+                if ($file_remote_head_check['statusCode'] !== 200) {
+                    IO::write('Failed');
+                } elseif (filesize($photo_path) !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
+                    IO::write('Failed');
+                } else {
+                    IO::write('Succesfully uploaded');
+                }
+            } else {
+                IO::write('Remote file already exists and same file size, skipping');
             }
 
             if ($is_album === false) {
@@ -106,8 +118,11 @@ readonly class DirectoryTask implements Task {
             }
 
             $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
+
+            $album_photos = $client->propFind($album_path, [], 1);
+
             IO::write('Photo must be in album ' . $album_path);
-            if ($client->request('HEAD', $album_path . '/' . $photo_remote_filename)['statusCode'] !== 404) {
+            if (isset($album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
                 IO::write('Already in album "' . $directory_name . '"');
             } else {
                 IO::write('Copying to album "' . $directory_name . '"');
