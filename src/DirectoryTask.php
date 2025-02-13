@@ -22,6 +22,9 @@ readonly class DirectoryTask implements Task {
 
     #[\Override]
     public function run(Channel $channel, Cancellation $cancellation): string {
+        if (is_dir($this->path . '/.migrated')) {
+            return 'already migrated';
+        }
         $client = new \Sabre\DAV\Client([
             'baseUri' => $this->nextcloud_url . '/remote.php/dav',
             'userName' => $this->nextcloud_user,
