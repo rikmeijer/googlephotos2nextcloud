@@ -15,7 +15,8 @@ readonly class DirectoryTask implements Task {
             private array $user_albums,
             private string $nextcloud_url,
             private string $nextcloud_user,
-            private string $nextcloud_password
+            private string $nextcloud_password,
+            private string $upload_mode
     ) {
 
     }
@@ -106,12 +107,20 @@ readonly class DirectoryTask implements Task {
                     IO::write('Failed');
                 } elseif (filesize($photo_path) !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
                     IO::write('Failed');
+                } elseif ($this->upload_mode === 'move') {
+                    IO::write('Succesfully uploaded, removing local file');
+                    unlink($photo_path);
                 } else {
                     IO::write('Succesfully uploaded');
                 }
+            } elseif ($this->upload_mode === 'move') {
+                IO::write('Remote file already exists and same file size, removing local file');
+                unlink($photo_path);
             } else {
                 IO::write('Remote file already exists and same file size, skipping');
             }
+
+
 
             if ($is_album === false) {
                 continue;

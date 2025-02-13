@@ -38,7 +38,13 @@ if (NEXTCLOUD_PASSWORD !== null) {
 }
 
 define('NEXTCLOUD_UPLOAD_PATH', $parsed_url['path']);
-IO::write('Uploading photos to ' . NEXTCLOUD_UPLOAD_PATH);
+define('UPLOAD_MODE', $_ENV['UPLOAD_MODE'] ?? 'copy');
+
+if (UPLOAD_MODE === 'move') {
+    IO::write('Moving photos to ' . NEXTCLOUD_UPLOAD_PATH);
+} else {
+    IO::write('Copying photos to ' . NEXTCLOUD_UPLOAD_PATH);
+}
 
 $client = new Sabre\DAV\Client([
     'baseUri' => NEXTCLOUD_URL . '/remote.php/dav',
@@ -99,7 +105,8 @@ foreach (glob(WORKING_DIRECTORY . '/*') as $path) {
                     $user_albums,
                     NEXTCLOUD_URL,
                     NEXTCLOUD_USER,
-                    NEXTCLOUD_PASSWORD
+                    NEXTCLOUD_PASSWORD,
+                    $_ENV['UPLOAD_MODE'] ?? 'copy'
             ));
 }
 
