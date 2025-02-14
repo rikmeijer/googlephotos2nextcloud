@@ -84,14 +84,17 @@ readonly class DirectoryTask implements Task {
             $photo_remote_filename = rawurlencode($photo_filename);
             $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
 
-            $file_remote_props = $client->propFind($photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
-
             $upload = true;
             $file_id = null;
-            if (count($file_remote_props) > 0) {
-                $remote_size = $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
-                $upload = filesize($photo_path) !== (int) $remote_size;
-                $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
+            try {
+                $file_remote_props = $client->propFind($photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
+                if (count($file_remote_props) > 0) {
+                    $remote_size = $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
+                    $upload = filesize($photo_path) !== (int) $remote_size;
+                    $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
+                }
+            } catch (\Sabre\HTTP\ClientHttpException $exception) {
+                $upload = $exception->getHttpStatus() === 404;
             }
 
             if ($upload) {
