@@ -87,6 +87,7 @@ readonly class DirectoryTask implements Task {
             $file_remote_props = $client->propFind($photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
 
             $upload = true;
+            $file_id = null;
             if (count($file_remote_props) > 0) {
                 $remote_size = $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
                 $upload = filesize($photo_path) !== (int) $remote_size;
@@ -100,8 +101,6 @@ readonly class DirectoryTask implements Task {
                 if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
                     IO::write('Failed');
                 }
-
-                $file_id = $response['oc-fileid'];
                 $file_remote_head_check = $client->request('HEAD', $photo_remote_path);
                 if ($file_remote_head_check['statusCode'] !== 200) {
                     IO::write('Failed');
@@ -120,8 +119,6 @@ readonly class DirectoryTask implements Task {
                 IO::write('Remote file already exists and same file size, skipping');
             }
 
-
-
             if ($is_album === false) {
                 continue;
             }
@@ -131,7 +128,7 @@ readonly class DirectoryTask implements Task {
             $album_photos = $client->propFind($album_path, [], 1);
 
             IO::write('Photo must be in album ' . $album_path);
-            if (isset($album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
+            if (isset($file_id, $album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
                 IO::write('Already in album "' . $directory_name . '"');
             } else {
                 IO::write('Copying to album "' . $directory_name . '"');
