@@ -40,15 +40,11 @@ readonly class DirectoryTask implements Task {
 
         $json_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json'));
         $metadata_jsons = array_filter($json_files, fn(string $p) => str_ends_with($p, 'metadata.json'));
-        $photo_jsons = array_filter($json_files, fn(string $p) => str_ends_with($p, 'metadata.json') === false);
         $photo_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json') === false);
 
         if (count($metadata_jsons) === 0) {
             IO::write('No metadata found');
-        } else {
-            $directory_metadata = IO::readJson(array_shift($metadata_jsons));
         }
-
 
         IO::write('Found ' . count($photo_files) . ' photo files');
         foreach ($photo_files as $photo_path) {
