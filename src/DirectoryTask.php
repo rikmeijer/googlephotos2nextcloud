@@ -50,7 +50,7 @@ readonly class DirectoryTask implements Task {
         }
 
 
-        IO::write('Found ' . count($photo_jsons) . ' photo files');
+        IO::write('Found ' . count($photo_files) . ' photo files');
         foreach ($photo_files as $photo_path) {
             $photo_filename = basename($photo_path);
             $exif = @exif_read_data($photo_path);
