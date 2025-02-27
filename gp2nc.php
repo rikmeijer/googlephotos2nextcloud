@@ -88,7 +88,7 @@ foreach ($available_directory_resources as $directory_id => $available_directory
 
 IO::write('Walking directories...');
 
-$pool = Worker\workerPool(new ContextWorkerPool(5));
+$pool = Worker\workerPool(new ContextWorkerPool());
 
 $executions = [];
 foreach (glob(WORKING_DIRECTORY . '/*') as $path) {
