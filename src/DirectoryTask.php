@@ -48,6 +48,7 @@ readonly class DirectoryTask implements Task {
 
         IO::write('Found ' . count($photo_files) . ' photo files');
         foreach ($photo_files as $photo_path) {
+            $force_upload = false;
             $photo_filename = basename($photo_path);
             $exif = @exif_read_data($photo_path);
             if (isset($exif['DateTimeOriginal'])) {
@@ -56,6 +57,18 @@ readonly class DirectoryTask implements Task {
                 $photo_metadata = IO::readJson($photo_path . '.json');
                 $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
                 $photo_taken_datetime = '@' . $photo_takentime_data['timestamp'];
+
+                IO::write("Using metadata json, updating EXIF DateTimeOriginal");
+                $image = new \Imagick();
+                try {
+                    $image->readImage($photo_path);
+                    $image->setImageProperty('Exif.Image.DateTimeOriginal', date('Y:M:D H:i:s', $photo_takentime_data['timestamp']));
+                    $image->writeImage();
+
+                    $force_upload = true;
+                } catch (\ImagickException $e) {
+                   IO::write('Failed updating EXIF data for ' . $photo_path);
+                }
             } else {
                 $photo_taken_datetime = '@' . filemtime($photo_path);
             }
@@ -86,7 +99,7 @@ readonly class DirectoryTask implements Task {
                 $file_remote_props = $client->propFind($photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
                 if (count($file_remote_props) > 0) {
                     $remote_size = $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
-                    $upload = filesize($photo_path) !== (int) $remote_size;
+                    $upload = $force_upload || filesize($photo_path) !== (int) $remote_size;
                     $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
                 }
             } catch (\Sabre\HTTP\ClientHttpException $exception) {
@@ -102,6 +115,8 @@ readonly class DirectoryTask implements Task {
                 }
                 $file_remote_head_check = $client->request('HEAD', $photo_remote_path);
                 if ($file_remote_head_check['statusCode'] !== 200) {
+                    IO::write('Failed');
+                } elseif (isset($file_remote_head_check['headers']['content-length']) === false) {
                     IO::write('Failed');
                 } elseif (filesize($photo_path) !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
                     IO::write('Failed');
