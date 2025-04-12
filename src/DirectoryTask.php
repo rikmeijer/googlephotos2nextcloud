@@ -22,10 +22,11 @@ readonly class DirectoryTask implements Task {
     }
 
     static function getMetadata(string $photo_path): mixed {
-        if (is_file($photo_path . '.json') !== false) {
-            return IO::readJson($photo_path . '.json');
-        } elseif (is_file($photo_path . '.supplemental-metadata.json') !== false) {
-            return IO::readJson($photo_path . '.supplemental-metadata.json');
+        $options = glob($photo_path . '*.json');
+        foreach ($options as $option) {
+            if (is_file($option) !== false) {
+                return IO::readJson($option);
+            }
         }
         return null;
     }
@@ -134,6 +135,13 @@ readonly class DirectoryTask implements Task {
                 } elseif ($this->upload_mode === 'move') {
                     IO::write('Succesfully uploaded, removing local file');
                     unlink($photo_path);
+
+                    $metadata_jsons = glob($photo_path . '*.json');
+                    foreach ($metadata_jsons as $metadata_json) {
+                        if (is_file($metadata_json) === true) {
+                            unlink($metadata_json);
+                        }
+                    }
                 } else {
                     IO::write('Succesfully uploaded');
                 }
@@ -141,11 +149,11 @@ readonly class DirectoryTask implements Task {
                 IO::write('Remote file already exists and same file size, removing local file and metadata');
                 unlink($photo_path);
 
-                if (is_file($photo_path . '.json') !== false) {
-                    unlink($photo_path . '.json');
-                }
-                if (is_file($photo_path . '.supplemental-metadata.json') !== false) {
-                    unlink($photo_path . '.supplemental-metadata.json');
+                $metadata_jsons = glob($photo_path . '*.json');
+                foreach ($metadata_jsons as $metadata_json) {
+                    if (is_file($metadata_json) === true) {
+                        unlink($metadata_json);
+                    }
                 }
             } else {
                 IO::write('Remote file already exists and same file size, skipping');
