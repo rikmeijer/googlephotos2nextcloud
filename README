@@ -14,14 +14,15 @@ php gp2nc.php
 ```
 
 # Run with docker
+"/path/to/Takeout/Google Photos" is the path where the general json files (e.g. user-generated-memory-titles.json) of your Takeout reside.
 
 ```
 docker build . -t gp2nc
-docker run --rm -v "/path/to/Takeout/Google Photos":/photos gp2nc -e NEXTCLOUD_URL=<NEXTCLOUD_URL>
+docker run --rm -v "/path/to/Takeout/Google Photos":/photos -e NEXTCLOUD_URL=<NEXTCLOUD_URL> gp2nc
 ```
 or use ready2use image (auto-build)
 ```
-docker run --rm -v "/path/to/Takeout/Google Photos":/photos ghcr.io/rikmeijer/googlephotos2nextcloud:latest  -e NEXTLCOUD_URL=<NEXTCLOUD_URL>
+docker run --rm -v "/path/to/Takeout/Google Photos":/photos -e NEXTCLOUD_URL=<NEXTCLOUD_URL> ghcr.io/rikmeijer/googlephotos2nextcloud:latest
 ```
 
 # If you like this tool
