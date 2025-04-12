@@ -21,6 +21,15 @@ readonly class DirectoryTask implements Task {
 
     }
 
+    static function getMetadata(string $photo_path): mixed {
+        if (is_file($photo_path . '.json') !== false) {
+            return IO::readJson($photo_path . '.json');
+        } elseif (is_file($photo_path . '.supplemental-metadata.json') !== false) {
+            return IO::readJson($photo_path . '.supplemental-metadata.json');
+        }
+        return null;
+    }
+
     #[\Override]
     public function run(Channel $channel, Cancellation $cancellation): string {
         if (is_dir($this->path . '/.migrated')) {
@@ -53,8 +62,7 @@ readonly class DirectoryTask implements Task {
             $exif = @exif_read_data($photo_path);
             if (isset($exif['DateTimeOriginal'])) {
                 $photo_taken_datetime = $exif['DateTimeOriginal'];
-            } elseif (is_file($photo_path . '.json') !== false) {
-                $photo_metadata = IO::readJson($photo_path . '.json');
+            } elseif ($photo_metadata = self::getMetadata($photo_path)) {
                 $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
                 $photo_taken_datetime = '@' . $photo_takentime_data['timestamp'];
 
