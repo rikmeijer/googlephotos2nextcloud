@@ -17,7 +17,7 @@ php gp2nc.php
 
 ```
 docker build . -t gp2nc
-docker run --rm -v "/path/to/Takeout/Google Photos":/photos gp2nc -e NEXTLCOUD_URL=<NEXTCLOUD_URL>
+docker run --rm -v "/path/to/Takeout/Google Photos":/photos gp2nc -e NEXTCLOUD_URL=<NEXTCLOUD_URL>
 ```
 or use ready2use image (auto-build)
 ```
