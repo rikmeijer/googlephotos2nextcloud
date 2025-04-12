@@ -5,6 +5,7 @@
     "require": {
         "php": "^8.4",
         "ext-exif": "*",
+        "ext-imagick": "*",
         "sabre/dav": "^4.7",
         "amphp/parallel": "^2.3",
         "vlucas/phpdotenv": "^5.6"
