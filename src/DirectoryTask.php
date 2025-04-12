@@ -138,8 +138,15 @@ readonly class DirectoryTask implements Task {
                     IO::write('Succesfully uploaded');
                 }
             } elseif ($this->upload_mode === 'move') {
-                IO::write('Remote file already exists and same file size, removing local file');
+                IO::write('Remote file already exists and same file size, removing local file and metadata');
                 unlink($photo_path);
+
+                if (is_file($photo_path . '.json') !== false) {
+                    unlink($photo_path . '.json');
+                }
+                if (is_file($photo_path . '.supplemental-metadata.json') !== false) {
+                    unlink($photo_path . '.supplemental-metadata.json');
+                }
             } else {
                 IO::write('Remote file already exists and same file size, skipping');
             }
