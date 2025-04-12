@@ -3,7 +3,6 @@ FROM php:8.4-cli
 RUN ["apt", "update"]
 RUN ["apt-get", "install", "-y", "libzip-dev", "zip", "libmagickwand-dev"]
 
-RUN ["docker-php-ext-install", "exif"]
 RUN ["pecl", "install", "imagick"]
 RUN ["docker-php-ext-enable", "imagick"]
 RUN ["docker-php-ext-install", "zip"]

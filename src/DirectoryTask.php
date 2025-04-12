@@ -59,27 +59,30 @@ readonly class DirectoryTask implements Task {
         foreach ($photo_files as $photo_path) {
             $force_upload = false;
             $photo_filename = basename($photo_path);
-            $exif = @exif_read_data($photo_path);
-            if (isset($exif['DateTimeOriginal'])) {
-                $photo_taken_datetime = $exif['DateTimeOriginal'];
-            } elseif ($photo_metadata = self::getMetadata($photo_path)) {
-                $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
-                $photo_taken_datetime = '@' . $photo_takentime_data['timestamp'];
 
-                IO::write("Using metadata json, updating EXIF DateTimeOriginal");
-                $image = new \Imagick();
-                try {
-                    $image->readImage($photo_path);
+            $photo_taken_datetime = '@' . filemtime($photo_path);
+            $image = new \Imagick();
+            try {
+                $image->readImage($photo_path);
+                $exif = $image->getImageProperties("exif:*");
+
+                if (isset($exif['DateTimeOriginal'])) {
+                    $photo_taken_datetime = $exif['DateTimeOriginal'];
+                } elseif ($photo_metadata = self::getMetadata($photo_path)) {
+                    $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
+                    $photo_taken_datetime = '@' . $photo_takentime_data['timestamp'];
+
+                    IO::write("Using metadata json, updating EXIF DateTimeOriginal");
                     $image->setImageProperty('Exif.Image.DateTimeOriginal', date('Y:M:D H:i:s', $photo_takentime_data['timestamp']));
                     $image->writeImage();
 
                     $force_upload = true;
-                } catch (\ImagickException $e) {
-                   IO::write('Failed updating EXIF data for ' . $photo_path);
                 }
-            } else {
-                $photo_taken_datetime = '@' . filemtime($photo_path);
+            } catch (\ImagickException $e) {
+                IO::write('Failed reading or updating EXIF data for ' . $photo_path);
             }
+
+
             try {
                 $photo_taken = new \DateTimeImmutable($photo_taken_datetime);
             } catch (\DateMalformedStringException $e) {
