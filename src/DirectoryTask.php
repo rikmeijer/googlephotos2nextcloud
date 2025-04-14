@@ -44,7 +44,7 @@ readonly class DirectoryTask implements Task {
         ]);
 
         $directory_name = basename($this->path);
-        $files = glob($this->path . '/*');
+        $files = array_filter(glob($this->path . '/*'), 'is_file');
         IO::write('Found "' . $directory_name . '", containing ' . count($files) . ' files');
         $is_album = in_array($directory_name, $this->user_albums);
 
