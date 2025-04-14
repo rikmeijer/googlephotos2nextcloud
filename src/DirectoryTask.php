@@ -21,14 +21,15 @@ readonly class DirectoryTask implements Task {
 
     }
 
-    static function getMetadata(string $photo_path): mixed {
+    static function getTakenTimeFromMetaData(string $photo_path): string {
         $options = glob($photo_path . '*.json');
         foreach ($options as $option) {
             if (is_file($option) !== false) {
-                return IO::readJson($option);
+                $photo_metadata = IO::readJson($option);
+                return ($photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'])['timestamp'];
             }
         }
-        return null;
+        return filemtime($photo_path);
     }
 
     #[\Override]
@@ -61,21 +62,17 @@ readonly class DirectoryTask implements Task {
             $force_upload = false;
             $photo_filename = basename($photo_path);
 
-            $photo_taken_datetime = '@' . filemtime($photo_path);
+            $photo_takentime_data = self::getTakenTimeFromMetaData($photo_path);
+            $photo_taken_datetime = '@' . $photo_takentime_data;
             $image = new \Imagick();
             try {
                 $image->readImage($photo_path);
                 $exif = $image->getImageProperties("exif:DateTime*");
 
                 $exif_datetime = $exif['exif:DateTimeOriginal'] ?? $exif['exif:DateTime'] ?? $exif['exif:DateTimeDigitized'] ?? null;
-
                 if (isset($exif_datetime)) {
                     $photo_taken_datetime = $exif_datetime;
-                } elseif ($photo_metadata = self::getMetadata($photo_path)) {
-                    $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
-                    $photo_taken_datetime = '@' . $photo_takentime_data['timestamp'];
-
-
+                } else {
                     $exif_datetime = date('Y:m:d H:i:s', $photo_takentime_data['timestamp']);
                     IO::write("Using metadata json for `$photo_filename`, updating EXIF DateTimeOriginal ($exif_datetime)");
                     $image->setImageProperty('Exif:DateTimeOriginal', $exif_datetime);
