@@ -65,16 +65,20 @@ readonly class DirectoryTask implements Task {
             $image = new \Imagick();
             try {
                 $image->readImage($photo_path);
-                $exif = $image->getImageProperties("exif:*");
+                $exif = $image->getImageProperties("exif:DateTime*");
 
-                if (isset($exif['DateTimeOriginal'])) {
-                    $photo_taken_datetime = $exif['DateTimeOriginal'];
+                $exif_datetime = $exif['exif:DateTimeOriginal'] ?? $exif['exif:DateTime'] ?? $exif['exif:DateTimeDigitized'] ?? null;
+
+                if (isset($exif_datetime)) {
+                    $photo_taken_datetime = $exif_datetime;
                 } elseif ($photo_metadata = self::getMetadata($photo_path)) {
                     $photo_takentime_data = $photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'];
                     $photo_taken_datetime = '@' . $photo_takentime_data['timestamp'];
 
-                    IO::write("Using metadata json, updating EXIF DateTimeOriginal");
-                    $image->setImageProperty('Exif.Image.DateTimeOriginal', date('Y:M:D H:i:s', $photo_takentime_data['timestamp']));
+
+                    $exif_datetime = date('Y:m:d H:i:s', $photo_takentime_data['timestamp']);
+                    IO::write("Using metadata json for `$photo_filename`, updating EXIF DateTimeOriginal ($exif_datetime)");
+                    $image->setImageProperty('Exif:DateTimeOriginal', $exif_datetime);
                     $image->writeImage();
 
                     $force_upload = true;
