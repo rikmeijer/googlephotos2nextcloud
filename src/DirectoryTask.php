@@ -8,6 +8,16 @@ use Amp\Cancellation;
 
 readonly class DirectoryTask implements Task {
 
+    const EXIF_DATE_SOURCES = [
+        'exif:DateTimeOriginal',
+        'exif:DateTime',
+        'exif:DateTimeDigitized'
+    ];
+    const EXIF_FORMATS = [
+        'Y-m-d_G:i:s' => '/\d+\-\d+\-\d+_\d+:\d+:\d+/',
+        'Y:m:d G:i:s' => '/\d+\:\d+\:\d+ \d+:\d+:\d+/'
+    ];
+
     public function __construct(
             private string $path,
             private string $files_base_path,
@@ -21,15 +31,50 @@ readonly class DirectoryTask implements Task {
 
     }
 
-    static function getTakenTimeFromMetaData(string $photo_path): string {
+    static function getTakenTimeFromMetaData(string $photo_path): \DateTimeImmutable {
+        $photo_filename = basename($photo_path);
+
         $options = glob($photo_path . '*.json');
         foreach ($options as $option) {
-            if (is_file($option) !== false) {
-                $photo_metadata = IO::readJson($option);
-                return ($photo_metadata['photoTakenTime'] ?? $photo_metadata['creationTime'])['timestamp'];
+            if (is_file($option) === false) {
+                continue;
+            }
+
+            $photo_metadata = IO::readJson($option);
+            if (isset($photo_metadata['photoTakenTime'])) {
+                IO::write('Found `photoTakenTime` in metadata for ' . $photo_filename);
+                $photo_takentime = $photo_metadata['photoTakenTime']['timestamp'];
+            } elseif (isset($photo_metadata['creationTime'])) {
+                IO::write('Found `creationTime` in metadata for ' . $photo_filename);
+                $photo_takentime = $photo_metadata['creationTime']['timestamp'];
+            } else {
+                IO::write('Found no datetime in metadata for ' . $photo_filename);
+                continue;
+            }
+
+            return new \DateTimeImmutable('@' . $photo_takentime);
+        }
+
+        $image = new \Imagick();
+        $image->readImage($photo_path);
+        $exif = $image->getImageProperties("exif:DateTime*");
+        foreach (self::EXIF_DATE_SOURCES as $exif_date_source) {
+            if (isset($exif[$exif_date_source]) === false) {
+                continue;
+            }
+
+            $exif_datetime = $exif[$exif_date_source];
+            foreach (self::EXIF_FORMATS as $exif_format => $exif_regex) {
+                if (preg_match($exif_regex, $exif_datetime) === 1) {
+                    IO::write('Found `' . $exif_datetime . '` in ' . $exif_date_source . ' for ' . $photo_filename);
+                    return \DateTimeImmutable::createFromFormat($exif_format, $exif_datetime);
+                }
             }
         }
-        return filemtime($photo_path);
+
+
+        IO::write('Found no datetime in exif data nor metadata for ' . $photo_filename . ', falling back to filemtime');
+        return new \DateTimeImmutable('@' . filemtime($photo_path));
     }
 
     #[\Override]
@@ -62,41 +107,7 @@ readonly class DirectoryTask implements Task {
             $force_upload = false;
             $photo_filename = basename($photo_path);
 
-            $photo_takentime_data = self::getTakenTimeFromMetaData($photo_path);
-            $photo_taken_datetime = '@' . $photo_takentime_data;
-            $image = new \Imagick();
-            try {
-                $image->readImage($photo_path);
-                $exif = $image->getImageProperties("exif:DateTime*");
-
-                $exif_datetime = $exif['exif:DateTimeOriginal'] ?? $exif['exif:DateTime'] ?? $exif['exif:DateTimeDigitized'] ?? null;
-                if (isset($exif_datetime)) {
-                    $photo_taken_datetime = $exif_datetime;
-                } else {
-                    $exif_datetime = date('Y:m:d H:i:s', $photo_takentime_data['timestamp']);
-                    IO::write("Using metadata json for `$photo_filename`, updating EXIF DateTimeOriginal ($exif_datetime)");
-                    $image->setImageProperty('Exif:DateTimeOriginal', $exif_datetime);
-                    $image->writeImage();
-
-                    $force_upload = true;
-                }
-            } catch (\ImagickException $e) {
-                IO::write('Failed reading or updating EXIF data for ' . $photo_path);
-            }
-
-
-            try {
-                $photo_taken = new \DateTimeImmutable($photo_taken_datetime);
-            } catch (\DateMalformedStringException $e) {
-                IO::write($photo_filename . ' has a improper' . (isset($exif['DateTimeOriginal']) ? ' exif' : '') . ' taken datetime: ' . $photo_taken_datetime . ', trying as Unix timestamp');
-                if (is_numeric($photo_taken_datetime)) {
-                    $photo_taken = new \DateTimeImmutable('@' . $photo_taken_datetime);
-                } elseif (preg_match('/\d+\-\d+\-\d+_\d+:\d+:\d+/', $photo_taken_datetime) === 1) {
-                    $photo_taken = \DateTimeImmutable::createFromFormat('Y-m-d_G:i:s', $photo_taken_datetime);
-                } else {
-                    exit('Failed ' . $photo_filename . ' please fix take datetime and restart');
-                }
-            }
+            $photo_taken = self::getTakenTimeFromMetaData($photo_path);
 
             $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
             if ($directory_remote_path === false) {
@@ -108,11 +119,12 @@ readonly class DirectoryTask implements Task {
 
             $upload = true;
             $file_id = null;
+            $local_size = filesize($photo_path);
             try {
                 $file_remote_props = $client->propFind($photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
                 if (count($file_remote_props) > 0) {
                     $remote_size = $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
-                    $upload = $force_upload || filesize($photo_path) !== (int) $remote_size;
+                    $upload = $force_upload || $local_size !== (int) $remote_size;
                     $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
                 }
             } catch (\Sabre\HTTP\ClientHttpException $exception) {
@@ -121,8 +133,12 @@ readonly class DirectoryTask implements Task {
 
             if ($upload) {
                 IO::write('Uploading "' . $photo_filename . '" to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
-                $response = $client->request('PUT', $photo_remote_path, fopen($photo_path, 'r+'));
-                
+                $response = $client->request('PUT', $photo_remote_path, fopen($photo_path, 'r+'), [
+                    'X-OC-MTime' => filemtime($photo_path),
+                    'X-OC-CTime' => $photo_taken->getTimestamp(),
+                    'OC-Total-Length' => $local_size
+                ]);
+
                 if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
                     IO::write('Failed');
                 }
