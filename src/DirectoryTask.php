@@ -31,30 +31,31 @@ readonly class DirectoryTask implements Task {
 
     }
 
-    static function getTakenTimeFromMetaData(string $photo_path): \DateTimeImmutable {
-        $photo_filename = basename($photo_path);
-
+    static function getTakenTimeFromMetaData(string $photo_path, callable $debug): \DateTimeImmutable {
         $options = glob($photo_path . '*.json');
-        foreach ($options as $option) {
-            if (is_file($option) === false) {
-                continue;
-            }
+        if (count($options) === 0) {
+            $debug('No metadata files found');
+        } else {
+            foreach ($options as $option) {
+                if (is_file($option) === false) {
+                    continue;
+                }
 
-            $photo_metadata = IO::readJson($option);
-            if (isset($photo_metadata['photoTakenTime'])) {
-                IO::write('Found `photoTakenTime` in metadata for ' . $photo_filename);
-                $photo_takentime = $photo_metadata['photoTakenTime']['timestamp'];
-            } elseif (isset($photo_metadata['creationTime'])) {
-                IO::write('Found `creationTime` in metadata for ' . $photo_filename);
-                $photo_takentime = $photo_metadata['creationTime']['timestamp'];
-            } else {
-                IO::write('Found no datetime in metadata for ' . $photo_filename);
-                continue;
-            }
+                $photo_metadata = IO::readJson($option);
+                if (isset($photo_metadata['photoTakenTime'])) {
+                    $debug('Found `photoTakenTime` in metadata');
+                    $photo_takentime = $photo_metadata['photoTakenTime']['timestamp'];
+                } elseif (isset($photo_metadata['creationTime'])) {
+                    $debug('Found `creationTime` in metadata');
+                    $photo_takentime = $photo_metadata['creationTime']['timestamp'];
+                } else {
+                    $debug('Found no datetime in metadata');
+                    continue;
+                }
 
-            return new \DateTimeImmutable('@' . $photo_takentime);
+                return new \DateTimeImmutable('@' . $photo_takentime);
+            }
         }
-
         $image = new \Imagick();
         $image->readImage($photo_path);
         $exif = $image->getImageProperties("exif:DateTime*");
@@ -66,14 +67,14 @@ readonly class DirectoryTask implements Task {
             $exif_datetime = $exif[$exif_date_source];
             foreach (self::EXIF_FORMATS as $exif_format => $exif_regex) {
                 if (preg_match($exif_regex, $exif_datetime) === 1) {
-                    IO::write('Found `' . $exif_datetime . '` in ' . $exif_date_source . ' for ' . $photo_filename);
+                    $debug('Found `' . $exif_datetime . '` in ' . $exif_date_source . '');
                     return \DateTimeImmutable::createFromFormat($exif_format, $exif_datetime);
                 }
             }
         }
 
 
-        IO::write('Found no datetime in exif data nor metadata for ' . $photo_filename . ', falling back to filemtime');
+        $debug('Found no datetime in exif data nor metadata, falling back to filemtime');
         return new \DateTimeImmutable('@' . filemtime($photo_path));
     }
 
@@ -106,8 +107,10 @@ readonly class DirectoryTask implements Task {
         foreach ($photo_files as $photo_path) {
             $force_upload = false;
             $photo_filename = basename($photo_path);
+            $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
 
-            $photo_taken = self::getTakenTimeFromMetaData($photo_path);
+            $photo_taken = self::getTakenTimeFromMetaData($photo_path, $debug);
+            $debug('Photo or video taken @ ' . $photo_taken->format('Y-m-d H:i:s'));
 
             $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
             if ($directory_remote_path === false) {
@@ -132,7 +135,7 @@ readonly class DirectoryTask implements Task {
             }
 
             if ($upload) {
-                IO::write('Uploading "' . $photo_filename . '" to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
+                $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
                 $response = $client->request('PUT', $photo_remote_path, fopen($photo_path, 'r+'), [
                     'X-OC-MTime' => filemtime($photo_path),
                     'X-OC-CTime' => $photo_taken->getTimestamp(),
@@ -140,17 +143,17 @@ readonly class DirectoryTask implements Task {
                 ]);
 
                 if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
-                    IO::write('Failed');
+                    $debug('Failed');
                 }
                 $file_remote_head_check = $client->request('HEAD', $photo_remote_path);
                 if ($file_remote_head_check['statusCode'] !== 200) {
-                    IO::write('Failed');
+                    $debug('Failed');
                 } elseif (isset($file_remote_head_check['headers']['content-length']) === false) {
-                    IO::write('Failed');
+                    $debug('Failed');
                 } elseif (filesize($photo_path) !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
-                    IO::write('Failed');
+                    $debug('Failed');
                 } elseif ($this->upload_mode === 'move') {
-                    IO::write('Succesfully uploaded, removing local file');
+                    $debug('Succesfully uploaded, removing local file');
                     unlink($photo_path);
 
                     $metadata_jsons = glob($photo_path . '*.json');
@@ -160,10 +163,10 @@ readonly class DirectoryTask implements Task {
                         }
                     }
                 } else {
-                    IO::write('Succesfully uploaded');
+                    $debug('Succesfully uploaded');
                 }
             } elseif ($this->upload_mode === 'move') {
-                IO::write('Remote file already exists and same file size, removing local file and metadata');
+                $debug('Remote file already exists and same file size, removing local file and metadata');
                 unlink($photo_path);
 
                 $metadata_jsons = glob($photo_path . '*.json');
@@ -173,7 +176,7 @@ readonly class DirectoryTask implements Task {
                     }
                 }
             } else {
-                IO::write('Remote file already exists and same file size, skipping');
+                $debug('Remote file already exists and same file size, skipping');
             }
 
             if ($is_album === false) {
@@ -184,11 +187,11 @@ readonly class DirectoryTask implements Task {
 
             $album_photos = $client->propFind($album_path, [], 1);
 
-            IO::write('Photo must be in album ' . $album_path);
+            $debug('Photo must be in album ' . $album_path);
             if (isset($file_id, $album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
-                IO::write('Already in album "' . $directory_name . '"');
+                $debug('Already in album "' . $directory_name . '"');
             } else {
-                IO::write('Copying to album "' . $directory_name . '"');
+                $debug('Copying to album "' . $directory_name . '"');
                 $client->request('COPY', $photo_remote_path, headers: [
                     'Destination' => $album_path . '/' . $photo_remote_filename
                 ]);
