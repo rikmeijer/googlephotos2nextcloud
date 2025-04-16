@@ -82,6 +82,8 @@ readonly class DirectoryTask implements Task {
     public function run(Channel $channel, Cancellation $cancellation): string {
         if (is_dir($this->path . '/.migrated')) {
             return 'already migrated';
+        } elseif (is_file($this->path . '/gp2nc-error.log')) {
+            return 'skip to prevent recurring crashes, resolve errors first and delete gp2nc-error.log';
         }
         $client = new \Sabre\DAV\Client([
             'baseUri' => $this->nextcloud_url . '/remote.php/dav',
@@ -109,7 +111,16 @@ readonly class DirectoryTask implements Task {
             $photo_filename = basename($photo_path);
             $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
 
-            $photo_taken = self::getTakenTimeFromMetaData($photo_path, $debug);
+            try {
+                $photo_taken = self::getTakenTimeFromMetaData($photo_path, $debug);
+            } catch (\Exception $e) {
+                file_put_contents($this->path . '/gp2nc-error.log', join(PHP_EOL, [
+                    'Failed reading metadata: ' . $e->getMessage(),
+                    $e->getFile() . '@' . $e->getLine(),
+                    $e->getTraceAsString()
+                ]));
+                return 'failed';
+            }
             $debug('Photo or video taken @ ' . $photo_taken->format('Y-m-d H:i:s'));
 
             $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
