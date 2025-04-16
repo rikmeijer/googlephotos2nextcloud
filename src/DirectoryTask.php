@@ -32,7 +32,15 @@ readonly class DirectoryTask implements Task {
     }
 
     static function getTakenTimeFromMetaData(string $photo_path, callable $debug): \DateTimeImmutable {
+        list($ext, $basename) = array_map('strrev', explode('.', strrev($photo_path), 2));
+
         $options = glob($photo_path . '*.json');
+        if (preg_match('/([^\(]+)(\(\d+\))$/', $basename, $matches) > 0) {
+            $original_filename = rtrim($matches[1]) . '.' . $ext;
+            $debug('Possible duplicate of `' . basename($original_filename) . '`, try to find additional metadata files: ' . $original_filename . '.*' . $matches[2] . '.json');
+            $options = array_merge($options, glob($matches[1] . '.' . $ext . '*' . $matches[2] . '.json'));
+        }
+
         if (count($options) === 0) {
             $debug('No metadata files found');
         } else {
@@ -56,8 +64,8 @@ readonly class DirectoryTask implements Task {
                 return new \DateTimeImmutable('@' . $photo_takentime);
             }
         }
-        $image = new \Imagick();
-        $image->readImage($photo_path);
+
+        $image = new \Imagick($photo_path);
         $exif = $image->getImageProperties("exif:DateTime*");
         foreach (self::EXIF_DATE_SOURCES as $exif_date_source) {
             if (isset($exif[$exif_date_source]) === false) {
