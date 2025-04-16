@@ -7,6 +7,8 @@ Replace NEXTCLOUD_URL with the following: https://<USER>:<APP_PASSWORD>@nextclou
 # Imagick extension required (with ffmpeg for video exif data)
 ```.env
 NEXTCLOUD_URL=<NEXTCLOUD_URL>
+NEXTCLOUD_USER=usernamehere # Optional, overwrites user in NEXTCLOUD_URL
+NEXTCLOUD_PASSWORD=secret # Optional, overwrites password in NEXTCLOUD_URL
 UPLOAD_MODE=copy # or move, which deletes local files after uploading or when the alreay exist remotely
 ```
 ```

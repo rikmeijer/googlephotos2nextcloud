@@ -29,12 +29,14 @@ if (isset($parsed_url['port'])) {
 define('NEXTCLOUD_URL', implode($origin));
 IO::write('Working on ' . NEXTCLOUD_URL);
 
-define('NEXTCLOUD_USER', $parsed_url['user']);
-IO::write('Working as ' . NEXTCLOUD_USER);
+define('NEXTCLOUD_USER', $_ENV['NEXTCLOUD_USER'] ?? $parsed_url['user'] ?? null);
+IO::write('Identifing as ' . NEXTCLOUD_USER ?? 'anonymous');
 
-define('NEXTCLOUD_PASSWORD', $parsed_url['pass'] ?? null);
+define('NEXTCLOUD_PASSWORD', $_ENV['NEXTCLOUD_PASSWORD'] ?? $parsed_url['pass'] ?? null);
 if (NEXTCLOUD_PASSWORD !== null) {
     IO::write('Identifing with a password.');
+} else {
+    IO::write('Not using a password.');
 }
 
 define('NEXTCLOUD_UPLOAD_PATH', $parsed_url['path']);
