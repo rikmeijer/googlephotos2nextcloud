@@ -37,8 +37,15 @@ readonly class DirectoryTask implements Task {
         $options = glob($photo_path . '*.json');
         if (preg_match('/([^\(]+)(\(\d+\))$/', $basename, $matches) > 0) {
             $original_filename = rtrim($matches[1]) . '.' . $ext;
-            $debug('Possible duplicate of `' . basename($original_filename) . '`, try to find additional metadata files: ' . $original_filename . '.*' . $matches[2] . '.json');
-            $options = array_merge($options, glob($matches[1] . '.' . $ext . '*' . $matches[2] . '.json'));
+            if (file_exists($original_filename) === false) {
+                $debug('Possible duplicate of `' . basename($original_filename) . '` in filename, but original file missing');
+            } elseif (filesize($photo_path) === filesize($original_filename)) {
+                $debug('Duplicate of `' . basename($original_filename) . '`, try to find additional metadata files: ' . $original_filename . '.*' . $matches[2] . '.json');
+                $options = array_merge($options, glob($matches[1] . '.' . $ext . '*' . $matches[2] . '.json'));
+            } else {
+                $debug('Possible duplicate of `' . basename($original_filename) . '` in filename, but filesize mismatch');
+                $options = glob($matches[1] . '.' . $ext . '*' . $matches[2] . '.json');
+            }
         }
 
         if (count($options) === 0) {
