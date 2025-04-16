@@ -7,6 +7,8 @@ RUN ["pecl", "install", "imagick"]
 RUN ["docker-php-ext-enable", "imagick"]
 RUN ["docker-php-ext-install", "zip"]
 
+COPY ["./docker/policy.xml", "/etc/ImageMagick-6/policy.xml"]
+
 WORKDIR "/app"
 COPY ["composer.json", "composer.lock", "gp2nc.php", "."]
 COPY ["src", "src"]
