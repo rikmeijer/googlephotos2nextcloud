@@ -93,6 +93,14 @@ readonly class DirectoryTask implements Task {
         return new \DateTimeImmutable('@' . filemtime($photo_path));
     }
 
+    static function storeException(string $path, \Exception $e) {
+        file_put_contents($path . '/gp2nc-error.log', join(PHP_EOL, [
+            'Failed reading metadata: ' . $e->getMessage(),
+            $e->getFile() . '@' . $e->getLine(),
+            $e->getTraceAsString()
+        ]));
+    }
+
     #[\Override]
     public function run(Channel $channel, Cancellation $cancellation): string {
         if (is_dir($this->path . '/.migrated')) {
@@ -129,11 +137,7 @@ readonly class DirectoryTask implements Task {
             try {
                 $photo_taken = self::getTakenTimeFromMetaData($photo_path, $debug);
             } catch (\Exception $e) {
-                file_put_contents($this->path . '/gp2nc-error.log', join(PHP_EOL, [
-                    'Failed reading metadata: ' . $e->getMessage(),
-                    $e->getFile() . '@' . $e->getLine(),
-                    $e->getTraceAsString()
-                ]));
+                self::storeException($this->path, $e);
                 return 'failed';
             }
             $debug('Photo or video taken @ ' . $photo_taken->format('Y-m-d H:i:s'));
@@ -171,7 +175,21 @@ readonly class DirectoryTask implements Task {
                 if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
                     $debug('Failed');
                 }
-                $file_remote_head_check = $client->request('HEAD', $photo_remote_path);
+                $attempts = 0;
+                do {
+                    $attempts++;
+                    try {
+                        $file_remote_head_check = $client->request('HEAD', $photo_remote_path);
+                    } catch (Sabre\HTTP\ClientException $e) {
+                        if ($attempts === 5) {
+                            self::storeException($this->path, $e);
+                            return 'failed';
+                        } else {
+                            $debug('attempt failed, retrying...');
+                        }
+                    }
+                } while ($attempts < 6);
+
                 if ($file_remote_head_check['statusCode'] !== 200) {
                     $debug('Failed');
                 } elseif (isset($file_remote_head_check['headers']['content-length']) === false) {
