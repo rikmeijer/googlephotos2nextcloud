@@ -93,12 +93,29 @@ readonly class DirectoryTask implements Task {
         return new \DateTimeImmutable('@' . filemtime($photo_path));
     }
 
-    static function storeException(string $path, \Exception $e) {
+    static function storeException(string $path, \Exception $e): string {
         file_put_contents($path . '/gp2nc-error.log', join(PHP_EOL, [
             'Failed reading metadata: ' . $e->getMessage(),
             $e->getFile() . '@' . $e->getLine(),
             $e->getTraceAsString()
         ]));
+        return 'failed: ' . $e->getMessage();
+    }
+
+    static function attempt(callable $debug, \Sabre\DAV\Client $client, string $method, mixed ...$args): mixed {
+        $attempts = 0;
+        do {
+            $attempts++;
+            try {
+                return $client->$method(...$args);
+            } catch (Sabre\HTTP\ClientException $e) {
+                if ($attempts === 5) {
+                    throw $e;
+                } else {
+                    $debug('attempt failed, retrying...');
+                }
+            }
+        } while ($attempts < 6);
     }
 
     #[\Override]
@@ -129,75 +146,76 @@ readonly class DirectoryTask implements Task {
         }
 
         IO::write('Found ' . count($photo_files) . ' photo files');
-        foreach ($photo_files as $photo_path) {
-            $force_upload = false;
-            $photo_filename = basename($photo_path);
-            $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
+        try {
+            foreach ($photo_files as $photo_path) {
+                $force_upload = false;
+                $photo_filename = basename($photo_path);
+                $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
 
-            try {
                 $photo_taken = self::getTakenTimeFromMetaData($photo_path, $debug);
-            } catch (\Exception $e) {
-                self::storeException($this->path, $e);
-                return 'failed';
-            }
-            $debug('Photo or video taken @ ' . $photo_taken->format('Y-m-d H:i:s'));
 
-            $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
-            if ($directory_remote_path === false) {
-                continue;
-            }
+                $debug('Photo or video taken @ ' . $photo_taken->format('Y-m-d H:i:s'));
 
-            $photo_remote_filename = rawurlencode($photo_filename);
-            $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
-
-            $upload = true;
-            $file_id = null;
-            $local_size = filesize($photo_path);
-            try {
-                $file_remote_props = $client->propFind($photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
-                if (count($file_remote_props) > 0) {
-                    $remote_size = $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
-                    $upload = $force_upload || $local_size !== (int) $remote_size;
-                    $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
+                $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
+                if ($directory_remote_path === false) {
+                    continue;
                 }
-            } catch (\Sabre\HTTP\ClientHttpException $exception) {
-                $upload = $exception->getHttpStatus() === 404;
-            }
 
-            if ($upload) {
-                $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
-                $response = $client->request('PUT', $photo_remote_path, fopen($photo_path, 'r+'), [
-                    'X-OC-MTime' => filemtime($photo_path),
-                    'X-OC-CTime' => $photo_taken->getTimestamp(),
-                    'OC-Total-Length' => $local_size
-                ]);
+                $photo_remote_filename = rawurlencode($photo_filename);
+                $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
 
-                if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
-                    $debug('Failed');
-                }
-                $attempts = 0;
-                do {
-                    $attempts++;
-                    try {
-                        $file_remote_head_check = $client->request('HEAD', $photo_remote_path);
-                    } catch (Sabre\HTTP\ClientException $e) {
-                        if ($attempts === 5) {
-                            self::storeException($this->path, $e);
-                            return 'failed';
-                        } else {
-                            $debug('attempt failed, retrying...');
-                        }
+                $upload = true;
+                $file_id = null;
+                $local_size = filesize($photo_path);
+                try {
+
+                    $file_remote_props = self::attempt($debug, $client, 'propFind', $photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
+
+                    if (count($file_remote_props) > 0) {
+                        $remote_size = $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
+                        $upload = $force_upload || $local_size !== (int) $remote_size;
+                        $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
                     }
-                } while ($attempts < 6);
+                } catch (\Sabre\HTTP\ClientHttpException $exception) {
+                    $upload = $exception->getHttpStatus() === 404;
+                }
 
-                if ($file_remote_head_check['statusCode'] !== 200) {
-                    $debug('Failed');
-                } elseif (isset($file_remote_head_check['headers']['content-length']) === false) {
-                    $debug('Failed');
-                } elseif (filesize($photo_path) !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
-                    $debug('Failed');
+                if ($upload) {
+                    $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
+
+                    $response = self::attempt($debug, $client, 'request', 'PUT', $photo_remote_path, fopen($photo_path, 'r+'), [
+                        'X-OC-MTime' => filemtime($photo_path),
+                        'X-OC-CTime' => $photo_taken->getTimestamp(),
+                        'OC-Total-Length' => $local_size
+                    ]);
+
+                    if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
+                        $debug('Failed');
+                    }
+
+                    $file_remote_head_check = self::attempt($debug, $client, 'request', 'HEAD', $photo_remote_path);
+
+                    if ($file_remote_head_check['statusCode'] !== 200) {
+                        $debug('Failed');
+                    } elseif (isset($file_remote_head_check['headers']['content-length']) === false) {
+                        $debug('Failed');
+                    } elseif (filesize($photo_path) !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
+                        $debug('Failed');
+                    } elseif ($this->upload_mode === 'move') {
+                        $debug('Succesfully uploaded, removing local file');
+                        unlink($photo_path);
+
+                        $metadata_jsons = glob($photo_path . '*.json');
+                        foreach ($metadata_jsons as $metadata_json) {
+                            if (is_file($metadata_json) === true) {
+                                unlink($metadata_json);
+                            }
+                        }
+                    } else {
+                        $debug('Succesfully uploaded');
+                    }
                 } elseif ($this->upload_mode === 'move') {
-                    $debug('Succesfully uploaded, removing local file');
+                    $debug('Remote file already exists and same file size, removing local file and metadata');
                     unlink($photo_path);
 
                     $metadata_jsons = glob($photo_path . '*.json');
@@ -207,39 +225,29 @@ readonly class DirectoryTask implements Task {
                         }
                     }
                 } else {
-                    $debug('Succesfully uploaded');
+                    $debug('Remote file already exists and same file size, skipping');
                 }
-            } elseif ($this->upload_mode === 'move') {
-                $debug('Remote file already exists and same file size, removing local file and metadata');
-                unlink($photo_path);
 
-                $metadata_jsons = glob($photo_path . '*.json');
-                foreach ($metadata_jsons as $metadata_json) {
-                    if (is_file($metadata_json) === true) {
-                        unlink($metadata_json);
-                    }
+                if ($is_album === false) {
+                    continue;
                 }
-            } else {
-                $debug('Remote file already exists and same file size, skipping');
+
+                $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
+
+                $album_photos = self::attempt($debug, $client, 'propFind', [], 1);
+
+                $debug('Photo must be in album ' . $album_path);
+                if (isset($file_id, $album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
+                    $debug('Already in album "' . $directory_name . '"');
+                } else {
+                    $debug('Copying to album "' . $directory_name . '"');
+                    self::attempt($debug, $client, 'request', 'COPY', $photo_remote_path, headers: [
+                        'Destination' => $album_path . '/' . $photo_remote_filename
+                    ]);
+                }
             }
-
-            if ($is_album === false) {
-                continue;
-            }
-
-            $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
-
-            $album_photos = $client->propFind($album_path, [], 1);
-
-            $debug('Photo must be in album ' . $album_path);
-            if (isset($file_id, $album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
-                $debug('Already in album "' . $directory_name . '"');
-            } else {
-                $debug('Copying to album "' . $directory_name . '"');
-                $client->request('COPY', $photo_remote_path, headers: [
-                    'Destination' => $album_path . '/' . $photo_remote_filename
-                ]);
-            }
+        } catch (\Exception $e) {
+            return self::storeException($this->path, $e);
         }
 
         mkdir($this->path . '/.migrated');
