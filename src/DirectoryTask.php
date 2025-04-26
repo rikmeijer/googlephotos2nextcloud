@@ -151,6 +151,7 @@ readonly class DirectoryTask implements Task {
                 $force_upload = false;
                 $photo_filename = basename($photo_path);
                 $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
+                $attempt = fn(string $method, mixed ...$args) => self::attempt($debug, $client, $method, ...$args);
 
                 $photo_taken = self::getTakenTimeFromMetaData($photo_path, $debug);
 
@@ -169,7 +170,7 @@ readonly class DirectoryTask implements Task {
                 $local_size = filesize($photo_path);
                 try {
 
-                    $file_remote_props = self::attempt($debug, $client, 'propFind', $photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
+                    $file_remote_props = $attempt('propFind', $photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
 
                     if (count($file_remote_props) > 0) {
                         $remote_size = $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
@@ -183,7 +184,7 @@ readonly class DirectoryTask implements Task {
                 if ($upload) {
                     $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
 
-                    $response = self::attempt($debug, $client, 'request', 'PUT', $photo_remote_path, fopen($photo_path, 'r+'), [
+                    $response = $attempt('request', 'PUT', $photo_remote_path, fopen($photo_path, 'r+'), [
                         'X-OC-MTime' => filemtime($photo_path),
                         'X-OC-CTime' => $photo_taken->getTimestamp(),
                         'OC-Total-Length' => $local_size
@@ -193,7 +194,7 @@ readonly class DirectoryTask implements Task {
                         $debug('Failed');
                     }
 
-                    $file_remote_head_check = self::attempt($debug, $client, 'request', 'HEAD', $photo_remote_path);
+                    $file_remote_head_check = $attempt('request', 'HEAD', $photo_remote_path);
 
                     if ($file_remote_head_check['statusCode'] !== 200) {
                         $debug('Failed');
@@ -234,14 +235,14 @@ readonly class DirectoryTask implements Task {
 
                 $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
 
-                $album_photos = self::attempt($debug, $client, 'propFind', [], 1);
+                $album_photos = $attempt('propFind', $album_path, [], 1);
 
                 $debug('Photo must be in album ' . $album_path);
                 if (isset($file_id, $album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
                     $debug('Already in album "' . $directory_name . '"');
                 } else {
                     $debug('Copying to album "' . $directory_name . '"');
-                    self::attempt($debug, $client, 'request', 'COPY', $photo_remote_path, headers: [
+                    $attempt('request', 'COPY', $photo_remote_path, headers: [
                         'Destination' => $album_path . '/' . $photo_remote_filename
                     ]);
                 }
