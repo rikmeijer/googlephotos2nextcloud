@@ -106,6 +106,7 @@ readonly class DirectoryTask implements Task {
         $attempts = 0;
         do {
             $attempts++;
+            $debug('attempt #' . $attempts . ' to ' . $method);
             try {
                 return $client->$method(...$args);
             } catch (Sabre\HTTP\ClientException $e) {
