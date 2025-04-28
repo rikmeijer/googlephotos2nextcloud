@@ -58,9 +58,14 @@ $client = new Sabre\DAV\Client([
 $user_albums = [];
 $user_albums_metadata_files = glob(WORKING_DIRECTORY . "/*/metadata.json");
 foreach ($user_albums_metadata_files as $user_albums_metadata_file) {
+    $user_album_name = basename(dirname($user_albums_metadata_file));
     $user_album_metadata = IO::readJson($user_albums_metadata_file);
-    if (isset($user_album_metadata['title'])) {
+    if (isset($user_album_metadata['title']) === false) {
+        continue;
+    } elseif (empty($user_album_metadata['title']) === false) {
         $user_albums[] = $user_album_metadata['title'];
+    } else {
+        $user_albums[] = $user_album_name;
     }
 }
 IO::write('Found ' . count($user_albums) . ' user albums');
