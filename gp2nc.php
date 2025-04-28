@@ -55,7 +55,14 @@ $client = new Sabre\DAV\Client([
         ]);
 
 
-$user_albums = IO::readJson(WORKING_DIRECTORY . "/user-generated-memory-titles.json")['title'];
+$user_albums = [];
+$user_albums_metadata_files = glob(WORKING_DIRECTORY . "/*/metadata.json");
+foreach ($user_albums_metadata_files as $user_albums_metadata_file) {
+    $user_album_metadata = IO::readJson($user_albums_metadata_file);
+    if (isset($user_album_metadata['title'])) {
+        $user_albums[] = $user_album_metadata['title'];
+    }
+}
 IO::write('Found ' . count($user_albums) . ' user albums');
 
 $files_base_path = '/remote.php/dav/files/' . NEXTCLOUD_USER;
