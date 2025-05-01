@@ -177,7 +177,7 @@ readonly class DirectoryTask implements Task {
                         } elseif ($local_size === $remote_size) {
                             $upload = false;
                         } else {
-                            // rename, because remote file has same name but different, non-zero filesize (so possibly a different photo)
+                            $debug('Rename remote target, because existing remote file has same name but different, non-zero filesize (so possibly a different photo)');
                             $photo_remote_filename = uniqid() . '-' . $photo_remote_filename;
                         }
                         $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
