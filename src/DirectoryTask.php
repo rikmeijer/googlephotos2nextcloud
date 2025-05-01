@@ -164,22 +164,29 @@ readonly class DirectoryTask implements Task {
                 }
 
                 $photo_remote_filename = rawurlencode($photo_filename);
-                $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
-
                 $upload = true;
                 $file_id = null;
                 $local_size = filesize($photo_path);
                 try {
 
-                    $file_remote_props = $attempt('propFind', $photo_remote_path, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
-
+                    $file_remote_props = $attempt('propFind', $directory_remote_path . '/' . $photo_remote_filename, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
                     if (count($file_remote_props) > 0) {
-                        $upload = $local_size !== (int) $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
+                        $remote_size = (int) $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
+                        if ($remote_size === 0) {
+                            
+                        } elseif ($local_size === $remote_size) {
+                            $upload = false;
+                        } else {
+                            // rename, because remote file has same name but different, non-zero filesize (so possibly a different photo)
+                            $photo_remote_filename = uniqid() . '-' . $photo_remote_filename;
+                        }
                         $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
                     }
                 } catch (\Sabre\HTTP\ClientHttpException $exception) {
                     $upload = $exception->getHttpStatus() === 404;
                 }
+
+                $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
 
                 if ($upload) {
                     $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
