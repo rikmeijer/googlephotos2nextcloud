@@ -150,7 +150,6 @@ readonly class DirectoryTask implements Task {
         IO::write('Found ' . count($photo_files) . ' photo files');
         try {
             foreach ($photo_files as $photo_path) {
-                $force_upload = false;
                 $photo_filename = basename($photo_path);
                 $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
                 $attempt = fn(string $method, mixed ...$args) => self::attempt($debug, $client, $method, ...$args);
@@ -176,7 +175,7 @@ readonly class DirectoryTask implements Task {
 
                     if (count($file_remote_props) > 0) {
                         $remote_size = $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
-                        $upload = $force_upload || $local_size !== (int) $remote_size;
+                        $upload = $local_size !== (int) $remote_size;
                         $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
                     }
                 } catch (\Sabre\HTTP\ClientHttpException $exception) {
