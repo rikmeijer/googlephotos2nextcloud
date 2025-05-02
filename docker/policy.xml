@@ -63,7 +63,7 @@
   <policy domain="resource" name="height" value="16KP"/>
   <!-- <policy domain="resource" name="list-length" value="128"/> -->
   <policy domain="resource" name="area" value="128MP"/>
-  <policy domain="resource" name="disk" value="8GiB"/>
+  <policy domain="resource" name="disk" value="32GiB"/>
   <!-- <policy domain="resource" name="file" value="768"/> -->
   <!-- <policy domain="resource" name="thread" value="4"/> -->
   <!-- <policy domain="resource" name="throttle" value="0"/> -->
