@@ -27,6 +27,13 @@ or use ready2use image (auto-build)
 docker run --rm -v "/path/to/Takeout/Google Photos":/photos -e NEXTCLOUD_URL=<NEXTCLOUD_URL> ghcr.io/rikmeijer/googlephotos2nextcloud:latest
 ```
 
+# Known errors
+
+Disk cache limit is set to 32GiB, files requiring larger cache will exhaust this and result in an error like:
+```
+Failed reading metadata: cache resources exhausted
+```
+
 # If you like this tool
 
 Donations are welcome: [Lightning](https://getalby.com/p/rik0) • [PayPal](https://www.paypal.com/donate/?hosted_button_id=B3WRGUUNZVDCL)
