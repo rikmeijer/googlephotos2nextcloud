@@ -148,9 +148,13 @@ readonly class DirectoryTask implements Task {
         }
 
         IO::write('Found ' . count($photo_files) . ' photo files');
+        $progress_directory = $this->path . '/.progress';
+        is_dir($progress_directory) || mkdir($progress_directory);
+
         try {
             foreach ($photo_files as $photo_path) {
                 $photo_filename = basename($photo_path);
+                $progress_filename = $progress_directory . DIRECTORY_SEPARATOR . $photo_filename . '.txt';
                 $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
                 $attempt = fn(string $method, mixed ...$args) => self::attempt($debug, $client, $method, ...$args);
 
@@ -161,59 +165,69 @@ readonly class DirectoryTask implements Task {
                 $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
                 if ($directory_remote_path === false) {
                     continue;
-                }
-
-                $photo_remote_filename = rawurlencode($photo_filename);
-                $upload = true;
-                $file_id = null;
-                $local_size = filesize($photo_path);
-                try {
-
-                    $file_remote_props = $attempt('propFind', $directory_remote_path . '/' . $photo_remote_filename, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
-                    if (count($file_remote_props) > 0) {
-                        $remote_size = (int) $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
-                        if ($remote_size === 0) {
-                            
-                        } elseif ($local_size === $remote_size) {
-                            $upload = false;
-                        } else {
-                            $debug('Rename remote target, because existing remote file has same name but different, non-zero filesize (so possibly a different photo)');
-                            $photo_remote_filename = uniqid() . '-' . $photo_remote_filename;
-                        }
-                        $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
-                    }
-                } catch (\Sabre\HTTP\ClientHttpException $exception) {
-                    $upload = $exception->getHttpStatus() === 404;
-                }
-
-                $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
-
-                if ($upload) {
-                    $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
-
-                    $response = $attempt('request', 'PUT', $photo_remote_path, fopen($photo_path, 'r+'), [
-                        'X-OC-MTime' => filemtime($photo_path),
-                        'X-OC-CTime' => $photo_taken->getTimestamp(),
-                        'OC-Total-Length' => $local_size
-                    ]);
-
-                    if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
-                        $debug('Failed');
-                    }
-
-                    $file_remote_head_check = $attempt('request', 'HEAD', $photo_remote_path);
-
-                    if ($file_remote_head_check['statusCode'] !== 200) {
-                        $debug('Failed');
-                    } elseif (isset($file_remote_head_check['headers']['content-length']) === false) {
-                        $debug('Failed');
-                    } elseif (filesize($photo_path) !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
-                        $debug('Failed');
-                    } else {
-                        $debug('Succesfully uploaded');
-                    }
+                } elseif (is_file($progress_filename)) {
+                    $photo_remote_path = file_get_contents($progress_filename);
+                    $photo_remote_filename = basename($photo_remote_path);
+                    $debug('Already uploaded as ' . $photo_remote_path);
                 } else {
-                    $debug('Remote file already exists and same file size, skipping');
+                    $photo_remote_filename = rawurlencode($photo_filename);
+                    $upload = true;
+                    $file_id = null;
+                    $local_size = filesize($photo_path);
+                    try {
+
+                        $file_remote_props = $attempt('propFind', $directory_remote_path . '/' . $photo_remote_filename, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
+                        if (count($file_remote_props) > 0) {
+                            $remote_size = (int) $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
+                            if ($remote_size === 0) {
+                                
+                            } elseif ($local_size === $remote_size) {
+                                $upload = false;
+                            } else {
+                                $debug('Rename remote target, because existing remote file has same name but different, non-zero filesize (so possibly a different photo)');
+                                $photo_remote_filename = uniqid() . '-' . $photo_remote_filename;
+                            }
+                            $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
+                        }
+                    } catch (\Sabre\HTTP\ClientHttpException $exception) {
+                        $upload = $exception->getHttpStatus() === 404;
+                    }
+
+                    $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
+
+                    if ($upload === false) {
+                        $debug('Remote file already exists and same file size, skipping');
+                    } else {
+                        $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
+
+                        $response = $attempt('request', 'PUT', $photo_remote_path, fopen($photo_path, 'r+'), [
+                            'X-OC-MTime' => filemtime($photo_path),
+                            'X-OC-CTime' => $photo_taken->getTimestamp(),
+                            'OC-Total-Length' => $local_size
+                        ]);
+
+                        if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
+                            $debug('Failed');
+                            continue;
+                        }
+
+                        $file_remote_head_check = $attempt('request', 'HEAD', $photo_remote_path);
+
+                        if ($file_remote_head_check['statusCode'] !== 200) {
+                            $debug('Failed');
+                            continue;
+                        } elseif (isset($file_remote_head_check['headers']['content-length']) === false) {
+                            $debug('Failed');
+                            continue;
+                        } elseif (filesize($photo_path) !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
+                            $debug('Failed');
+                            continue;
+                        } else {
+                            $debug('Succesfully uploaded');
+                        }
+                    }
+
+                    file_put_contents($progress_filename, $photo_remote_path);
                 }
 
                 if ($is_album === false) {
