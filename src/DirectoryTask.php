@@ -25,8 +25,7 @@ readonly class DirectoryTask implements Task {
             private array $user_albums,
             private string $nextcloud_url,
             private string $nextcloud_user,
-            private string $nextcloud_password,
-            private string $upload_mode
+            private string $nextcloud_password
     ) {
 
     }
@@ -127,6 +126,7 @@ readonly class DirectoryTask implements Task {
         } elseif (is_file($this->path . '/gp2nc-error.log')) {
             return 'skip to prevent recurring crashes, resolve errors first and delete gp2nc-error.log';
         }
+
         $client = new \Sabre\DAV\Client([
             'baseUri' => $this->nextcloud_url . '/remote.php/dav',
             'userName' => $this->nextcloud_user,
@@ -209,28 +209,8 @@ readonly class DirectoryTask implements Task {
                         $debug('Failed');
                     } elseif (filesize($photo_path) !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
                         $debug('Failed');
-                    } elseif ($this->upload_mode === 'move') {
-                        $debug('Succesfully uploaded, removing local file');
-                        unlink($photo_path);
-
-                        $metadata_jsons = glob($photo_path . '*.json');
-                        foreach ($metadata_jsons as $metadata_json) {
-                            if (is_file($metadata_json) === true) {
-                                unlink($metadata_json);
-                            }
-                        }
                     } else {
                         $debug('Succesfully uploaded');
-                    }
-                } elseif ($this->upload_mode === 'move') {
-                    $debug('Remote file already exists and same file size, removing local file and metadata');
-                    unlink($photo_path);
-
-                    $metadata_jsons = glob($photo_path . '*.json');
-                    foreach ($metadata_jsons as $metadata_json) {
-                        if (is_file($metadata_json) === true) {
-                            unlink($metadata_json);
-                        }
                     }
                 } else {
                     $debug('Remote file already exists and same file size, skipping');
