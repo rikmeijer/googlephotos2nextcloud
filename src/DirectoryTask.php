@@ -143,21 +143,22 @@ readonly class DirectoryTask implements Task {
         $metadata_jsons = array_filter($json_files, fn(string $p) => str_ends_with($p, 'metadata.json'));
         $photo_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json') === false);
 
+        $no_photos = count($photo_files);
         if (count($metadata_jsons) === 0) {
             IO::write('No metadata found');
         }
 
-        IO::write('Found ' . count($photo_files) . ' photo files');
+        IO::write('Found ' . $no_photos . ' photo files');
         $progress_directory = $this->path . '/.progress';
         is_dir($progress_directory) || mkdir($progress_directory);
 
         try {
-            foreach ($photo_files as $photo_index => $photo_path) {
+            foreach (array_values($photo_files) as $photo_index => $photo_path) {
                 $photo_filename = basename($photo_path);
                 $progress_filename = $progress_directory . DIRECTORY_SEPARATOR . $photo_filename . '.txt';
                 $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
 
-                $debug('Photo ' . $photo_index . ' of ' . count($photo_files));
+                $debug('Photo ' . $photo_index . ' of ' . $no_photos);
                 if (is_file($progress_filename)) {
                     $photo_remote_path = file_get_contents($progress_filename);
                     $photo_remote_filename = basename($photo_remote_path);
