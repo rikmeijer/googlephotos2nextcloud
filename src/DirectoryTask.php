@@ -138,11 +138,12 @@ readonly class DirectoryTask implements Task {
 
         $directory_name = basename($this->path);
         $files = array_filter(glob($this->path . '/*'), 'is_file');
-        IO::write('Found "' . $directory_name . '", containing ' . count($files) . ' files');
+        $directory_debug('Found "' . $directory_name . '", containing ' . count($files) . ' files');
 
         if ($this->is_album) {
             $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
             $album_photos = $attempt('propFind', $album_path, [], 1);
+            $directory_debug('Found album "' . $directory_name . '", containing ' . count($album_photos) . ' photos');
         }
 
         $json_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json'));
