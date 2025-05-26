@@ -109,7 +109,7 @@ foreach (glob(WORKING_DIRECTORY . '/*') as $path) {
                     $path,
                     $files_base_path . NEXTCLOUD_UPLOAD_PATH,
                     $albums_base_path,
-                    in_array(basename($path), $this->user_albums),
+                    in_array(basename($path), $user_albums),
                     NEXTCLOUD_URL,
                     NEXTCLOUD_USER,
                     NEXTCLOUD_PASSWORD
