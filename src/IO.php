@@ -15,19 +15,38 @@ class IO {
     static function progressPath(string $base_path, string $md5_fingerprint): string {
         $progress_path = $base_path . DIRECTORY_SEPARATOR . '.progress';
         is_dir($progress_path) || mkdir($progress_path);
-        return $progress_path . DIRECTORY_SEPARATOR . $md5_fingerprint . '.txt';
+        return $progress_path . DIRECTORY_SEPARATOR . $md5_fingerprint;
     }
 
-    static function checkProgress(string $base_path, string $md5_fingerprint): string {
+    static function checkProgress(string $base_path, string $md5_fingerprint): ?array {
         $progress_filename = self::progressPath($base_path, $md5_fingerprint);
-        if (is_file($progress_filename) === false) {
-            return null;
+        if (is_file($progress_filename . '.txt')) {
+            return [file_get_contents($progress_filename . '.txt'), []];
+        } elseif (is_file($progress_filename . '.json')) {
+            return json_decode(file_get_contents($progress_filename . '.json'), true);
         }
-        return file_get_contents($progress_filename);
+        return null;
     }
 
-    static function updateProgress(string $base_path, string $md5_fingerprint, string $photo_remote_path): void {
-        file_put_contents(self::progressPath($base_path, $md5_fingerprint), $photo_remote_path);
+    static function updateProgress(string $base_path, string $md5_fingerprint, string $photo_remote_path, ?string $album): void {
+        $progress_filename = self::progressPath($base_path, $md5_fingerprint);
+
+        $progress = self::checkProgress($base_path, $md5_fingerprint);
+        if ($progress === null) {
+            $albums = [];
+        } else {
+            $albums = $progress[1];
+        }
+
+        if ($album !== null) {
+            $albums[] = $album;
+        }
+
+        if (is_file($progress_filename . '.txt')) {
+            unlink($progress_filename . '.txt');
+        }
+
+        file_put_contents($progress_filename . '.json', json_encode([$photo_remote_path, array_unique($albums)]));
     }
 
     static function mkdir(\Sabre\DAV\Client $client, string $remote_base, string $remote_path): bool {

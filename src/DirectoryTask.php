@@ -22,7 +22,7 @@ readonly class DirectoryTask implements Task {
             private string $path,
             private string $files_base_path,
             private string $albums_base_path,
-            private array $user_albums,
+            private bool $is_album,
             private string $nextcloud_url,
             private string $nextcloud_user,
             private string $nextcloud_password
@@ -137,7 +137,6 @@ readonly class DirectoryTask implements Task {
         $directory_name = basename($this->path);
         $files = array_filter(glob($this->path . '/*'), 'is_file');
         IO::write('Found "' . $directory_name . '", containing ' . count($files) . ' files');
-        $is_album = in_array($directory_name, $this->user_albums);
 
         $json_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json'));
         $metadata_jsons = array_filter($json_files, fn(string $p) => str_ends_with($p, 'metadata.json'));
@@ -152,7 +151,7 @@ readonly class DirectoryTask implements Task {
         $progress_directory = $this->path . '/.progress';
 
         $read_progress = fn(string $md5_fingerprint): string => IO::checkProgress(dirname($this->path), $md5_fingerprint);
-        $write_progress = fn(string $md5_fingerprint, string $photo_remote_path) => IO::updateProgress(dirname($this->path), $md5_fingerprint, $photo_remote_path);
+        $write_progress = fn(string $md5_fingerprint, string $photo_remote_path, ?string $album) => IO::updateProgress(dirname($this->path), $md5_fingerprint, $photo_remote_path, $album);
 
         try {
             foreach (array_values($photo_files) as $photo_index => $photo_path) {
@@ -172,10 +171,16 @@ readonly class DirectoryTask implements Task {
                     }
                 }
 
-                $photo_remote_path = $read_progress($fingerprint);
-                if ($photo_remote_path !== null) {
+                $progress = $read_progress($fingerprint);
+                if ($progress !== null) {
+                    $photo_remote_path = $progress[0];
                     $photo_remote_filename = basename($photo_remote_path);
                     $debug('Already uploaded as ' . $photo_remote_path);
+
+                    if (in_array($directory_name, $progress[1])) {
+                        $debug('Already added to album "' . $directory_name . '"');
+                        continue;
+                    }
                 } else {
 
                     $photo_taken = self::getTakenTimeFromMetaData($photo_path, $debug);
@@ -244,15 +249,14 @@ readonly class DirectoryTask implements Task {
                         }
                     }
 
-                    $write_progress($fingerprint, $photo_remote_path);
+                    $write_progress($fingerprint, $photo_remote_path, null);
                 }
 
-                if ($is_album === false) {
+                if ($this->is_album === false) {
                     continue;
                 }
 
                 $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
-
                 $album_photos = $attempt('propFind', $album_path, [], 1);
 
                 $debug('Photo must be in album ' . $album_path);
@@ -263,6 +267,7 @@ readonly class DirectoryTask implements Task {
                     $attempt('request', 'COPY', $photo_remote_path, headers: [
                         'Destination' => $album_path . '/' . $photo_remote_filename
                     ]);
+                    $write_progress($fingerprint, $photo_remote_path, $directory_name);
                 }
             }
         } catch (\Exception $e) {
