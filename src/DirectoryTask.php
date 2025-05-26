@@ -171,7 +171,7 @@ readonly class DirectoryTask implements Task {
                 if (is_dir($progress_directory)) {
                     $progress_filename = $progress_directory . DIRECTORY_SEPARATOR . $photo_filename . '.txt';
                     if (is_file($progress_filename)) {
-                        $write_progress($fingerprint, file_get_contents($progress_filename));
+                        $write_progress($fingerprint, file_get_contents($progress_filename), null);
                         unlink($progress_filename);
                         $debug('Old progress file, moved to global progress directory.');
                     }
