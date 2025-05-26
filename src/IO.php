@@ -12,6 +12,24 @@ class IO {
         return json_decode(file_get_contents($path), true);
     }
 
+    static function progressPath(string $base_path, string $md5_fingerprint): string {
+        $progress_path = $base_path . DIRECTORY_SEPARATOR . '.progress';
+        is_dir($progress_path) || mkdir($progress_path);
+        return $progress_path . DIRECTORY_SEPARATOR . $md5_fingerprint . '.txt';
+    }
+
+    static function checkProgress(string $base_path, string $md5_fingerprint): string {
+        $progress_filename = self::progressPath($base_path, $md5_fingerprint);
+        if (is_file($progress_filename) === false) {
+            return null;
+        }
+        return file_get_contents($progress_filename);
+    }
+
+    static function updateProgress(string $base_path, string $md5_fingerprint, string $photo_remote_path): void {
+        file_put_contents(self::progressPath($base_path, $md5_fingerprint), $photo_remote_path);
+    }
+
     static function mkdir(\Sabre\DAV\Client $client, string $remote_base, string $remote_path): bool {
         $directory_remote_head = $client->request('HEAD', $remote_base . $remote_path);
         if ($directory_remote_head['statusCode'] !== 404) {
