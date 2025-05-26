@@ -175,7 +175,7 @@ readonly class DirectoryTask implements Task {
                 if ($progress !== null) {
                     $photo_remote_path = $progress[0];
                     $photo_remote_filename = basename($photo_remote_path);
-                    $debug('Already uploaded as ' . $photo_remote_path);
+                    $debug('Already uploaded as ' . $photo_remote_path . ' - ' . $fingerprint);
 
                     if (in_array($directory_name, $progress[1])) {
                         $debug('Already added to album "' . $directory_name . '"');
