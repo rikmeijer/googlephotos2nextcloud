@@ -133,10 +133,17 @@ readonly class DirectoryTask implements Task {
             'password' => $this->nextcloud_password,
             'authType' => \Sabre\DAV\Client::AUTH_BASIC
         ]);
+        $directory_debug = fn(string $message) => IO::write($message);
+        $attempt = fn(string $method, mixed ...$args) => self::attempt($directory_debug, $client, $method, ...$args);
 
         $directory_name = basename($this->path);
         $files = array_filter(glob($this->path . '/*'), 'is_file');
         IO::write('Found "' . $directory_name . '", containing ' . count($files) . ' files');
+
+        if ($this->is_album) {
+            $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
+            $album_photos = $attempt('propFind', $album_path, [], 1);
+        }
 
         $json_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json'));
         $metadata_jsons = array_filter($json_files, fn(string $p) => str_ends_with($p, 'metadata.json'));
@@ -157,8 +164,7 @@ readonly class DirectoryTask implements Task {
             foreach (array_values($photo_files) as $photo_index => $photo_path) {
                 $fingerprint = md5_file($photo_path);
                 $photo_filename = basename($photo_path);
-                $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
-                $attempt = fn(string $method, mixed ...$args) => self::attempt($debug, $client, $method, ...$args);
+                $debug = fn(string $message) => $directory_debug('[' . $photo_filename . '] - ' . $message);
 
                 $debug('Photo ' . $photo_index . ' of ' . $no_photos);
 
@@ -252,12 +258,9 @@ readonly class DirectoryTask implements Task {
                     $write_progress($fingerprint, $photo_remote_path, null);
                 }
 
-                if ($this->is_album === false) {
+                if (isset($album_path) === false) {
                     continue;
                 }
-
-                $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
-                $album_photos = $attempt('propFind', $album_path, [], 1);
 
                 $debug('Photo must be in album ' . $album_path);
                 if (isset($file_id, $album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
