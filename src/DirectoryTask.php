@@ -159,6 +159,7 @@ readonly class DirectoryTask implements Task {
                 $fingerprint = md5_file($photo_path);
                 $photo_filename = basename($photo_path);
                 $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
+                $attempt = fn(string $method, mixed ...$args) => self::attempt($debug, $client, $method, ...$args);
 
                 $debug('Photo ' . $photo_index . ' of ' . $no_photos);
 
@@ -176,7 +177,6 @@ readonly class DirectoryTask implements Task {
                     $photo_remote_filename = basename($photo_remote_path);
                     $debug('Already uploaded as ' . $photo_remote_path);
                 } else {
-                    $attempt = fn(string $method, mixed ...$args) => self::attempt($debug, $client, $method, ...$args);
 
                     $photo_taken = self::getTakenTimeFromMetaData($photo_path, $debug);
 
