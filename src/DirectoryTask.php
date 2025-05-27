@@ -138,7 +138,6 @@ readonly class DirectoryTask implements Task {
 
         $directory_name = basename($this->path);
         $files = array_filter(glob($this->path . '/*'), 'is_file');
-        $directory_debug('Found "' . $directory_name . '", containing ' . count($files) . ' files');
 
         if ($this->is_album) {
             $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
@@ -149,6 +148,8 @@ readonly class DirectoryTask implements Task {
         $json_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json'));
         $metadata_jsons = array_filter($json_files, fn(string $p) => str_ends_with($p, 'metadata.json'));
         $photo_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json') === false);
+
+        $directory_debug('Found "' . $directory_name . '", containing ' . count($photo_files) . ' photos');
 
         $no_photos = count($photo_files);
         if (count($metadata_jsons) === 0) {
