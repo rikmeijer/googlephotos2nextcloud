@@ -280,7 +280,7 @@ readonly class DirectoryTask implements Task {
 
         if (count(glob($progress_directory . '/*.txt')) === 0) {
             rmdir($progress_directory);
-            $debug('Removing old progress directory');
+            $directory_debug('Removing old progress directory');
         }
 
         mkdir($this->path . '/.migrated');
