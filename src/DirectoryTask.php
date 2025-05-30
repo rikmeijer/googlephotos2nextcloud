@@ -185,7 +185,7 @@ readonly class DirectoryTask implements Task {
                     }
 
                     $photo_remote_filename = rawurlencode($photo_filename);
-                    $upload = true;
+                    $already_exists_remotely = false;
                     $file_id = null;
                     $local_size = filesize($photo_path);
                     try {
@@ -195,7 +195,7 @@ readonly class DirectoryTask implements Task {
                             if ($remote_size === 0) {
                                 
                             } elseif ($local_size === $remote_size) {
-                                $upload = false;
+                                $already_exists_remotely = true;
                             } else {
                                 $debug('Rename remote target, because existing remote file has same name but different, non-zero filesize (so possibly a different photo)');
                                 $photo_remote_filename = uniqid() . '-' . $photo_remote_filename;
@@ -203,12 +203,12 @@ readonly class DirectoryTask implements Task {
                             $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
                         }
                     } catch (\Sabre\HTTP\ClientHttpException $exception) {
-                        $upload = $exception->getHttpStatus() === 404;
+                        $already_exists_remotely = $exception->getHttpStatus() !== 404;
                     }
 
                     $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
 
-                    if ($upload === false) {
+                    if ($already_exists_remotely) {
                         $debug('Remote file already exists and same file size, skipping');
                     } else {
                         $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
