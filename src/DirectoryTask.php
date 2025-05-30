@@ -213,30 +213,14 @@ readonly class DirectoryTask implements Task {
                     } else {
                         $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
 
-                        $response = $attempt('request', 'PUT', $photo_remote_path, fopen($photo_path, 'r+'), [
-                            'X-OC-MTime' => filemtime($photo_path),
-                            'X-OC-CTime' => $photo_taken->getTimestamp(),
-                            'OC-Total-Length' => $local_size
-                        ]);
 
-                        if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
-                            $debug('Failed');
-                            continue;
-                        }
+                        if (self::upload($photo_path, $photo_taken, $photo_remote_path)) {
 
-                        $file_remote_head_check = $attempt('request', 'HEAD', $photo_remote_path);
-
-                        if ($file_remote_head_check['statusCode'] !== 200) {
-                            $debug('Failed');
-                            continue;
-                        } elseif (isset($file_remote_head_check['headers']['content-length']) === false) {
-                            $debug('Failed');
-                            continue;
-                        } elseif (filesize($photo_path) !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
-                            $debug('Failed');
-                            continue;
-                        } else {
                             $debug('Succesfully uploaded');
+                        } else {
+
+                            $debug('Failed');
+                            continue;
                         }
                     }
 
@@ -264,5 +248,31 @@ readonly class DirectoryTask implements Task {
 
         mkdir($this->path . '/.migrated');
         return 'done';
+    }
+
+    static function upload(callable $attempt, string $source, \DateTime $photo_taken, string $target): bool {
+        $local_size = filesize($source);
+
+        $response = $attempt('request', 'PUT', $target, fopen($source, 'r+'), [
+            'X-OC-MTime' => filemtime($source),
+            'X-OC-CTime' => $photo_taken->getTimestamp(),
+            'OC-Total-Length' => $local_size
+        ]);
+
+        if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
+            return false;
+        }
+
+        $file_remote_head_check = $attempt('request', 'HEAD', $target);
+
+        if ($file_remote_head_check['statusCode'] !== 200) {
+            return false;
+        } elseif (isset($file_remote_head_check['headers']['content-length']) === false) {
+            return false;
+        } elseif ($local_size !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
+            return false;
+        }
+
+        return true;
     }
 }
