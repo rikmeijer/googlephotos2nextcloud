@@ -21,14 +21,22 @@ class IO {
 
         $response = $client->request('MKCOL', $remote_base . $remote_path);
         if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
-            IO::write('Failed creating "' . $remote_path . '" remotely "' . $response['statusCode'] . '"');
             return false;
         }
         IO::write('Directory "' . $remote_path . '" created remotely');
         return true;
     }
 
-    static function createDirectory(\Sabre\DAV\Client $client, string $remote_base, string $remote_path): string|bool {
+    /**
+     *
+     * @staticvar array $cache
+     * @param \Sabre\DAV\Client $client
+     * @param string $remote_base
+     * @param string $remote_path
+     * @return string
+     * @throws \Exception
+     */
+    static function createDirectory(\Sabre\DAV\Client $client, string $remote_base, string $remote_path): string {
         static $cache = [];
         if (isset($cache[$remote_base . $remote_path])) {
             return $cache[$remote_base . $remote_path] ? $remote_base . $remote_path : false;
@@ -38,8 +46,7 @@ class IO {
         foreach (explode('/', ltrim($remote_path, '/')) as $remote_path_part) {
             $creating .= '/' . $remote_path_part;
             if (self::mkdir($client, $remote_base, $creating) === false) {
-                $cache[$remote_base . $creating] = false;
-                return false;
+                throw new \Exception('Failed creating "' . $remote_path . '" remotely "' . $response['statusCode'] . '"');
             }
         }
         $cache[$remote_base . $remote_path] = true;

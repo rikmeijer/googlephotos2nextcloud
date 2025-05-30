@@ -104,9 +104,6 @@ readonly class DirectoryTask implements Task {
                     $debug('Photo or video taken @ ' . Metadata::takenTime($photo_path)->format('Y-m-d H:i:s'));
 
                     $directory_remote_path = IO::createDirectory($client, $this->files_base_path, Metadata::takenTime($photo_path)->format('/Y/m'));
-                    if ($directory_remote_path === false) {
-                        continue;
-                    }
 
                     $photo_remote_filename = rawurlencode($photo_filename);
                     $file_id = null;
