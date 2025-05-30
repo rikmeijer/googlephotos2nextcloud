@@ -108,11 +108,9 @@ readonly class DirectoryTask implements Task {
 
                     if (isset($file_id)) {
                         $debug('Remote file already exists and same file size, skipping');
-                    } elseif (self::upload($photo_path, $photo_remote_path)) {
-                        $debug('Succesfully uploaded to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
                     } else {
-                        $debug('Failed');
-                        continue;
+                        RemoteFile::upload($photo_path, $photo_remote_path);
+                        $debug('Succesfully uploaded to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
                     }
 
                     Progress::update($photo_path, $photo_remote_path, null);
@@ -139,31 +137,5 @@ readonly class DirectoryTask implements Task {
 
         mkdir($this->path . '/.migrated');
         return 'done';
-    }
-
-    static function upload(callable $attempt, string $source, string $target): bool {
-        $local_size = filesize($source);
-
-        $response = $attempt('request', 'PUT', $target, fopen($source, 'r+'), [
-            'X-OC-MTime' => filemtime($source),
-            'X-OC-CTime' => Metadata::takenTime($source)->getTimestamp(),
-            'OC-Total-Length' => $local_size
-        ]);
-
-        if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
-            return false;
-        }
-
-        $file_remote_head_check = $attempt('request', 'HEAD', $target);
-
-        if ($file_remote_head_check['statusCode'] !== 200) {
-            return false;
-        } elseif (isset($file_remote_head_check['headers']['content-length']) === false) {
-            return false;
-        } elseif ($local_size !== (int) $file_remote_head_check['headers']['content-length'][0] ?? 0) {
-            return false;
-        }
-
-        return true;
     }
 }
