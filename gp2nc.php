@@ -108,8 +108,7 @@ foreach (glob(WORKING_DIRECTORY . '/*') as $path) {
     $executions[$path] = Worker\submit(new DirectoryTask(
                     $path,
                     $files_base_path . NEXTCLOUD_UPLOAD_PATH,
-                    $albums_base_path,
-                    in_array(basename($path), $user_albums),
+                    in_array(basename($path), $user_albums) ? $albums_base_path . '/' . rawurlencode(basename($path)) : null,
                     NEXTCLOUD_URL,
                     NEXTCLOUD_USER,
                     NEXTCLOUD_PASSWORD

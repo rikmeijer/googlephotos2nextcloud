@@ -11,8 +11,7 @@ readonly class DirectoryTask implements Task {
     public function __construct(
             private string $path,
             private string $files_base_path,
-            private string $albums_base_path,
-            private bool $is_album,
+            private ?string $album_path,
             private string $nextcloud_url,
             private string $nextcloud_user,
             private string $nextcloud_password
@@ -48,9 +47,8 @@ readonly class DirectoryTask implements Task {
         $files = array_filter(glob($this->path . '/*'), 'is_file');
         IO::write('Found "' . $directory_name . '", containing ' . count($files) . ' files');
 
-        if ($this->is_album) {
-            $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
-            $album_photos = $attempt('propFind', $album_path, [], 1);
+        if (isset($this->album_path)) {
+            $album_photos = $attempt('propFind', $this->album_path, [], 1);
             IO::write('Found album "' . $directory_name . '", containing ' . count($album_photos) . ' photos');
         }
 
@@ -115,17 +113,17 @@ readonly class DirectoryTask implements Task {
                     Progress::update($photo_path, $photo_remote_path, null);
                 }
 
-                if (isset($album_path) === false) {
+                if (isset($this->album_path) === false) {
                     continue;
                 }
 
-                $debug('Photo must be in album ' . $album_path);
-                if (isset($file_id, $album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
+                $debug('Photo must be in album ' . $this->album_path);
+                if (isset($file_id, $album_photos[$this->album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
                     $debug('Already in album "' . $directory_name . '"');
                 } else {
                     $debug('Copying to album "' . $directory_name . '"');
                     $attempt('request', 'COPY', $photo_remote_path, headers: [
-                        'Destination' => $album_path . '/' . $photo_remote_filename
+                        'Destination' => $this->album_path . '/' . $photo_remote_filename
                     ]);
                     Progress::update($photo_path, $photo_remote_path, $directory_name);
                 }
