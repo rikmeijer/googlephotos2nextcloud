@@ -8,16 +8,6 @@ use Amp\Cancellation;
 
 readonly class DirectoryTask implements Task {
 
-    const EXIF_DATE_SOURCES = [
-        'exif:DateTimeOriginal',
-        'exif:DateTime',
-        'exif:DateTimeDigitized'
-    ];
-    const EXIF_FORMATS = [
-        'Y-m-d_G:i:s' => '/\d+\-\d+\-\d+_\d+:\d+:\d+/',
-        'Y:m:d G:i:s' => '/\d+\:\d+\:\d+ \d+:\d+:\d+/'
-    ];
-
     public function __construct(
             private string $path,
             private string $files_base_path,
@@ -28,69 +18,6 @@ readonly class DirectoryTask implements Task {
             private string $nextcloud_password
     ) {
 
-    }
-
-    static function getTakenTimeFromMetaData(string $photo_path): \DateTimeImmutable {
-        list($ext, $basename) = array_map('strrev', explode('.', strrev($photo_path), 2));
-
-        $photo_filename = basename($photo_path);
-        $options = glob($photo_path . '*.json');
-        if (preg_match('/([^\(]+)(\(\d+\))$/', $basename, $matches) > 0) {
-            $original_filename = rtrim($matches[1]) . '.' . $ext;
-            if (file_exists($original_filename) === false) {
-                IO::write('[' . $photo_filename . '] - ' . 'Possible duplicate of `' . basename($original_filename) . '` in filename, but original file missing');
-            } elseif (filesize($photo_path) === filesize($original_filename)) {
-                IO::write('[' . $photo_filename . '] - ' . 'Duplicate of `' . basename($original_filename) . '`, try to find additional metadata files: ' . $original_filename . '.*' . $matches[2] . '.json');
-                $options = array_merge($options, glob($matches[1] . '.' . $ext . '*' . $matches[2] . '.json'));
-            } else {
-                IO::write('[' . $photo_filename . '] - ' . 'Possible duplicate of `' . basename($original_filename) . '` in filename, but filesize mismatch');
-                $options = glob($matches[1] . '.' . $ext . '*' . $matches[2] . '.json');
-            }
-        }
-
-        if (count($options) === 0) {
-            IO::write('[' . $photo_filename . '] - ' . 'No metadata files found');
-        } else {
-            foreach ($options as $option) {
-                if (is_file($option) === false) {
-                    continue;
-                }
-
-                $photo_metadata = IO::readJson($option);
-                if (isset($photo_metadata['photoTakenTime'])) {
-                    IO::write('[' . $photo_filename . '] - ' . 'Found `photoTakenTime` in metadata');
-                    $photo_takentime = $photo_metadata['photoTakenTime']['timestamp'];
-                } elseif (isset($photo_metadata['creationTime'])) {
-                    IO::write('[' . $photo_filename . '] - ' . 'Found `creationTime` in metadata');
-                    $photo_takentime = $photo_metadata['creationTime']['timestamp'];
-                } else {
-                    IO::write('[' . $photo_filename . '] - ' . 'Found no datetime in metadata');
-                    continue;
-                }
-
-                return new \DateTimeImmutable('@' . $photo_takentime);
-            }
-        }
-
-        $image = new \Imagick($photo_path);
-        $exif = $image->getImageProperties("exif:DateTime*");
-        foreach (self::EXIF_DATE_SOURCES as $exif_date_source) {
-            if (isset($exif[$exif_date_source]) === false) {
-                continue;
-            }
-
-            $exif_datetime = $exif[$exif_date_source];
-            foreach (self::EXIF_FORMATS as $exif_format => $exif_regex) {
-                if (preg_match($exif_regex, $exif_datetime) === 1) {
-                    IO::write('[' . $photo_filename . '] - ' . 'Found `' . $exif_datetime . '` in ' . $exif_date_source . '');
-                    return \DateTimeImmutable::createFromFormat($exif_format, $exif_datetime);
-                }
-            }
-        }
-
-
-        IO::write('[' . $photo_filename . '] - ' . 'Found no datetime in exif data nor metadata, falling back to filemtime');
-        return new \DateTimeImmutable('@' . filemtime($photo_path));
     }
 
     static function storeException(string $path, \Exception $e): string {
@@ -174,12 +101,9 @@ readonly class DirectoryTask implements Task {
                         continue;
                     }
                 } else {
+                    $debug('Photo or video taken @ ' . Metadata::takenTime($photo_path)->format('Y-m-d H:i:s'));
 
-                    $photo_taken = self::getTakenTimeFromMetaData($photo_path);
-
-                    $debug('Photo or video taken @ ' . $photo_taken->format('Y-m-d H:i:s'));
-
-                    $directory_remote_path = IO::createDirectory($client, $this->files_base_path, $photo_taken->format('/Y/m'));
+                    $directory_remote_path = IO::createDirectory($client, $this->files_base_path, Metadata::takenTime($photo_path)->format('/Y/m'));
                     if ($directory_remote_path === false) {
                         continue;
                     }
@@ -187,14 +111,13 @@ readonly class DirectoryTask implements Task {
                     $photo_remote_filename = rawurlencode($photo_filename);
                     $already_exists_remotely = false;
                     $file_id = null;
-                    $local_size = filesize($photo_path);
                     try {
                         $file_remote_props = $attempt('propFind', $directory_remote_path . '/' . $photo_remote_filename, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
                         if (count($file_remote_props) > 0) {
                             $remote_size = (int) $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
                             if ($remote_size === 0) {
                                 
-                            } elseif ($local_size === $remote_size) {
+                            } elseif (filesize($photo_path) === $remote_size) {
                                 $already_exists_remotely = true;
                             } else {
                                 $debug('Rename remote target, because existing remote file has same name but different, non-zero filesize (so possibly a different photo)');
@@ -214,7 +137,7 @@ readonly class DirectoryTask implements Task {
                         $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
 
 
-                        if (self::upload($photo_path, $photo_taken, $photo_remote_path)) {
+                        if (self::upload($photo_path, $photo_remote_path)) {
 
                             $debug('Succesfully uploaded');
                         } else {
@@ -250,12 +173,12 @@ readonly class DirectoryTask implements Task {
         return 'done';
     }
 
-    static function upload(callable $attempt, string $source, \DateTime $photo_taken, string $target): bool {
+    static function upload(callable $attempt, string $source, string $target): bool {
         $local_size = filesize($source);
 
         $response = $attempt('request', 'PUT', $target, fopen($source, 'r+'), [
             'X-OC-MTime' => filemtime($source),
-            'X-OC-CTime' => $photo_taken->getTimestamp(),
+            'X-OC-CTime' => Metadata::takenTime($photo_path)->getTimestamp(),
             'OC-Total-Length' => $local_size
         ]);
 
