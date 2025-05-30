@@ -109,42 +109,32 @@ readonly class DirectoryTask implements Task {
                     }
 
                     $photo_remote_filename = rawurlencode($photo_filename);
-                    $already_exists_remotely = false;
                     $file_id = null;
                     try {
                         $file_remote_props = $attempt('propFind', $directory_remote_path . '/' . $photo_remote_filename, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
-                        if (count($file_remote_props) > 0) {
-                            $remote_size = (int) $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
-                            if ($remote_size === 0) {
-                                
-                            } elseif (filesize($photo_path) === $remote_size) {
-                                $already_exists_remotely = true;
-                            } else {
-                                $debug('Rename remote target, because existing remote file has same name but different, non-zero filesize (so possibly a different photo)');
-                                $photo_remote_filename = uniqid() . '-' . $photo_remote_filename;
-                            }
+                        if (isset($file_remote_props['{http://owncloud.org/ns}size']) === false) {
+                            
+                        } elseif ((int) $file_remote_props['{http://owncloud.org/ns}size'] === 0) {
+
+                        } elseif (filesize($photo_path) === (int) $file_remote_props['{http://owncloud.org/ns}size']) {
                             $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
+                        } else {
+                            $debug('Rename remote target, because existing remote file has same name but different, non-zero filesize (so possibly a different photo)');
+                            $photo_remote_filename = uniqid() . '-' . $photo_remote_filename;
                         }
                     } catch (\Sabre\HTTP\ClientHttpException $exception) {
-                        $already_exists_remotely = $exception->getHttpStatus() !== 404;
+                        
                     }
 
                     $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
 
-                    if ($already_exists_remotely) {
+                    if (isset($file_id)) {
                         $debug('Remote file already exists and same file size, skipping');
+                    } elseif (self::upload($photo_path, $photo_remote_path)) {
+                        $debug('Succesfully uploaded to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
                     } else {
-                        $debug('Uploading to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
-
-
-                        if (self::upload($photo_path, $photo_remote_path)) {
-
-                            $debug('Succesfully uploaded');
-                        } else {
-
-                            $debug('Failed');
-                            continue;
-                        }
+                        $debug('Failed');
+                        continue;
                     }
 
                     Progress::update($photo_path, $photo_remote_path, null);
@@ -178,7 +168,7 @@ readonly class DirectoryTask implements Task {
 
         $response = $attempt('request', 'PUT', $target, fopen($source, 'r+'), [
             'X-OC-MTime' => filemtime($source),
-            'X-OC-CTime' => Metadata::takenTime($photo_path)->getTimestamp(),
+            'X-OC-CTime' => Metadata::takenTime($source)->getTimestamp(),
             'OC-Total-Length' => $local_size
         ]);
 
