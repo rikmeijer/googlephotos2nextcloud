@@ -30,25 +30,26 @@ readonly class DirectoryTask implements Task {
 
     }
 
-    static function getTakenTimeFromMetaData(string $photo_path, callable $debug): \DateTimeImmutable {
+    static function getTakenTimeFromMetaData(string $photo_path): \DateTimeImmutable {
         list($ext, $basename) = array_map('strrev', explode('.', strrev($photo_path), 2));
 
+        $photo_filename = basename($photo_path);
         $options = glob($photo_path . '*.json');
         if (preg_match('/([^\(]+)(\(\d+\))$/', $basename, $matches) > 0) {
             $original_filename = rtrim($matches[1]) . '.' . $ext;
             if (file_exists($original_filename) === false) {
-                $debug('Possible duplicate of `' . basename($original_filename) . '` in filename, but original file missing');
+                IO::write('[' . $photo_filename . '] - ' . 'Possible duplicate of `' . basename($original_filename) . '` in filename, but original file missing');
             } elseif (filesize($photo_path) === filesize($original_filename)) {
-                $debug('Duplicate of `' . basename($original_filename) . '`, try to find additional metadata files: ' . $original_filename . '.*' . $matches[2] . '.json');
+                IO::write('[' . $photo_filename . '] - ' . 'Duplicate of `' . basename($original_filename) . '`, try to find additional metadata files: ' . $original_filename . '.*' . $matches[2] . '.json');
                 $options = array_merge($options, glob($matches[1] . '.' . $ext . '*' . $matches[2] . '.json'));
             } else {
-                $debug('Possible duplicate of `' . basename($original_filename) . '` in filename, but filesize mismatch');
+                IO::write('[' . $photo_filename . '] - ' . 'Possible duplicate of `' . basename($original_filename) . '` in filename, but filesize mismatch');
                 $options = glob($matches[1] . '.' . $ext . '*' . $matches[2] . '.json');
             }
         }
 
         if (count($options) === 0) {
-            $debug('No metadata files found');
+            IO::write('[' . $photo_filename . '] - ' . 'No metadata files found');
         } else {
             foreach ($options as $option) {
                 if (is_file($option) === false) {
@@ -57,13 +58,13 @@ readonly class DirectoryTask implements Task {
 
                 $photo_metadata = IO::readJson($option);
                 if (isset($photo_metadata['photoTakenTime'])) {
-                    $debug('Found `photoTakenTime` in metadata');
+                    IO::write('[' . $photo_filename . '] - ' . 'Found `photoTakenTime` in metadata');
                     $photo_takentime = $photo_metadata['photoTakenTime']['timestamp'];
                 } elseif (isset($photo_metadata['creationTime'])) {
-                    $debug('Found `creationTime` in metadata');
+                    IO::write('[' . $photo_filename . '] - ' . 'Found `creationTime` in metadata');
                     $photo_takentime = $photo_metadata['creationTime']['timestamp'];
                 } else {
-                    $debug('Found no datetime in metadata');
+                    IO::write('[' . $photo_filename . '] - ' . 'Found no datetime in metadata');
                     continue;
                 }
 
@@ -81,14 +82,14 @@ readonly class DirectoryTask implements Task {
             $exif_datetime = $exif[$exif_date_source];
             foreach (self::EXIF_FORMATS as $exif_format => $exif_regex) {
                 if (preg_match($exif_regex, $exif_datetime) === 1) {
-                    $debug('Found `' . $exif_datetime . '` in ' . $exif_date_source . '');
+                    IO::write('[' . $photo_filename . '] - ' . 'Found `' . $exif_datetime . '` in ' . $exif_date_source . '');
                     return \DateTimeImmutable::createFromFormat($exif_format, $exif_datetime);
                 }
             }
         }
 
 
-        $debug('Found no datetime in exif data nor metadata, falling back to filemtime');
+        IO::write('[' . $photo_filename . '] - ' . 'Found no datetime in exif data nor metadata, falling back to filemtime');
         return new \DateTimeImmutable('@' . filemtime($photo_path));
     }
 
@@ -101,18 +102,18 @@ readonly class DirectoryTask implements Task {
         return 'failed: ' . $e->getMessage();
     }
 
-    static function attempt(callable $debug, \Sabre\DAV\Client $client, string $method, mixed ...$args): mixed {
+    static function attempt(\Sabre\DAV\Client $client, string $method, mixed ...$args): mixed {
         $attempts = 0;
         do {
             $attempts++;
-            $debug('attempt #' . $attempts . ' to ' . $method);
+            IO::write('attempt #' . $attempts . ' to ' . $method);
             try {
                 return $client->$method(...$args);
             } catch (Sabre\HTTP\ClientException $e) {
                 if ($attempts === 5) {
                     throw $e;
                 } else {
-                    $debug('attempt failed, retrying in 10 seconds...');
+                    IO::write('attempt failed, retrying in 10 seconds...');
                     sleep(10);
                 }
             }
@@ -133,17 +134,16 @@ readonly class DirectoryTask implements Task {
             'password' => $this->nextcloud_password,
             'authType' => \Sabre\DAV\Client::AUTH_BASIC
         ]);
-        $directory_debug = fn(string $message) => IO::write($message);
-        $attempt = fn(string $method, mixed ...$args) => self::attempt($directory_debug, $client, $method, ...$args);
+        $attempt = fn(string $method, mixed ...$args) => self::attempt($client, $method, ...$args);
 
         $directory_name = basename($this->path);
         $files = array_filter(glob($this->path . '/*'), 'is_file');
-        $directory_debug('Found "' . $directory_name . '", containing ' . count($files) . ' files');
+        IO::write('Found "' . $directory_name . '", containing ' . count($files) . ' files');
 
         if ($this->is_album) {
             $album_path = $this->albums_base_path . '/' . rawurlencode($directory_name);
             $album_photos = $attempt('propFind', $album_path, [], 1);
-            $directory_debug('Found album "' . $directory_name . '", containing ' . count($album_photos) . ' photos');
+            IO::write('Found album "' . $directory_name . '", containing ' . count($album_photos) . ' photos');
         }
 
         $json_files = array_filter($files, fn(string $p) => str_ends_with($p, '.json'));
@@ -159,7 +159,7 @@ readonly class DirectoryTask implements Task {
         try {
             foreach (array_values($photo_files) as $photo_index => $photo_path) {
                 $photo_filename = basename($photo_path);
-                $debug = fn(string $message) => $directory_debug('[' . $photo_filename . '] - ' . $message);
+                $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
 
                 $debug('Photo ' . $photo_index . ' of ' . $no_photos);
 
@@ -175,7 +175,7 @@ readonly class DirectoryTask implements Task {
                     }
                 } else {
 
-                    $photo_taken = self::getTakenTimeFromMetaData($photo_path, $debug);
+                    $photo_taken = self::getTakenTimeFromMetaData($photo_path);
 
                     $debug('Photo or video taken @ ' . $photo_taken->format('Y-m-d H:i:s'));
 
