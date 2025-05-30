@@ -66,8 +66,7 @@ readonly class DirectoryTask implements Task {
         IO::write('Found ' . $no_photos . ' photo files');
         try {
             foreach (array_values($photo_files) as $photo_index => $photo_path) {
-                $photo_filename = basename($photo_path);
-                $debug = fn(string $message) => IO::write('[' . $photo_filename . '] - ' . $message);
+                $debug = fn(string $message) => IO::write('[' . basename($photo_path) . '] - ' . $message);
 
                 $debug('Photo ' . $photo_index . ' of ' . $no_photos);
 
@@ -86,7 +85,7 @@ readonly class DirectoryTask implements Task {
 
                     $directory_remote_path = RemoteDirectory::create($attempt, $this->files_base_path, Metadata::takenTime($photo_path)->format('/Y/m'));
 
-                    $photo_remote_filename = rawurlencode($photo_filename);
+                    $photo_remote_filename = rawurlencode(basename($photo_path));
                     $file_id = null;
                     try {
                         $file_remote_props = $attempt('propFind', $directory_remote_path . '/' . $photo_remote_filename, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
