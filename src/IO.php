@@ -20,6 +20,22 @@ class IO {
     }
 
     static function checkProgress(string $photo_path): ?array {
+        $progress_directory = dirname($photo_path) . '/.progress';
+        if (is_dir($progress_directory)) {
+            $photo_filename = basename($photo_path);
+            $progress_filename = $progress_directory . DIRECTORY_SEPARATOR . $photo_filename . '.txt';
+            if (is_file($progress_filename)) {
+                self::updateProgress($photo_path, file_get_contents($progress_filename), null);
+                unlink($progress_filename);
+                self::write('[' . $photo_filename . '] - Old progress file, moved to global progress directory.');
+            }
+
+            if (count(glob($progress_directory . '/*.txt')) === 0) {
+                rmdir($progress_directory);
+                self::write('Removing old progress directory');
+            }
+        }
+
         $progress_filename = self::progressPath($photo_path);
         if (is_file($progress_filename . '.txt')) {
             return [file_get_contents($progress_filename . '.txt'), []];

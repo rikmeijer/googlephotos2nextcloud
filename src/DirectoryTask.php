@@ -156,7 +156,6 @@ readonly class DirectoryTask implements Task {
         }
 
         IO::write('Found ' . $no_photos . ' photo files');
-        $progress_directory = $this->path . '/.progress';
 
         $read_progress = fn(string $photo_path) => IO::checkProgress($photo_path);
         $write_progress = fn(string $photo_path, string $photo_remote_path, ?string $album) => IO::updateProgress($photo_path, $photo_remote_path, $album);
@@ -167,15 +166,6 @@ readonly class DirectoryTask implements Task {
                 $debug = fn(string $message) => $directory_debug('[' . $photo_filename . '] - ' . $message);
 
                 $debug('Photo ' . $photo_index . ' of ' . $no_photos);
-
-                if (is_dir($progress_directory)) {
-                    $progress_filename = $progress_directory . DIRECTORY_SEPARATOR . $photo_filename . '.txt';
-                    if (is_file($progress_filename)) {
-                        $write_progress($photo_path, file_get_contents($progress_filename), null);
-                        unlink($progress_filename);
-                        $debug('Old progress file, moved to global progress directory.');
-                    }
-                }
 
                 $progress = $read_progress($photo_path);
                 if ($progress !== null) {
@@ -275,13 +265,6 @@ readonly class DirectoryTask implements Task {
             }
         } catch (\Exception $e) {
             return self::storeException($this->path, $e);
-        }
-
-        if (is_dir($progress_directory) === false) {
-            
-        } elseif (count(glob($progress_directory . '/*.txt')) === 0) {
-            rmdir($progress_directory);
-            $directory_debug('Removing old progress directory');
         }
 
         mkdir($this->path . '/.migrated');
