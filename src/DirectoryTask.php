@@ -278,7 +278,9 @@ readonly class DirectoryTask implements Task {
             return self::storeException($this->path, $e);
         }
 
-        if (count(glob($progress_directory . '/*.txt')) === 0) {
+        if (is_dir($progress_directory) === false) {
+            
+        } elseif (count(glob($progress_directory . '/*.txt')) === 0) {
             rmdir($progress_directory);
             $directory_debug('Removing old progress directory');
         }
