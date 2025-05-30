@@ -158,8 +158,8 @@ readonly class DirectoryTask implements Task {
         IO::write('Found ' . $no_photos . ' photo files');
         $progress_directory = $this->path . '/.progress';
 
-        $read_progress = fn(string $md5_fingerprint) => IO::checkProgress(dirname($this->path), $md5_fingerprint);
-        $write_progress = fn(string $md5_fingerprint, string $photo_remote_path, ?string $album) => IO::updateProgress(dirname($this->path), $md5_fingerprint, $photo_remote_path, $album);
+        $read_progress = fn(string $md5_fingerprint) => IO::checkProgress($this->path, $md5_fingerprint);
+        $write_progress = fn(string $md5_fingerprint, string $photo_remote_path, ?string $album) => IO::updateProgress($this->path, $md5_fingerprint, $photo_remote_path, $album);
 
         try {
             foreach (array_values($photo_files) as $photo_index => $photo_path) {

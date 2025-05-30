@@ -12,14 +12,14 @@ class IO {
         return json_decode(file_get_contents($path), true);
     }
 
-    static function progressPath(string $base_path, string $md5_fingerprint): string {
-        $progress_path = $base_path . DIRECTORY_SEPARATOR . '.progress';
+    static function progressPath(string $album_path, string $md5_fingerprint): string {
+        $progress_path = dirname($album_path) . DIRECTORY_SEPARATOR . '.progress';
         is_dir($progress_path) || mkdir($progress_path);
         return $progress_path . DIRECTORY_SEPARATOR . $md5_fingerprint;
     }
 
-    static function checkProgress(string $base_path, string $md5_fingerprint): ?array {
-        $progress_filename = self::progressPath($base_path, $md5_fingerprint);
+    static function checkProgress(string $album_path, string $md5_fingerprint): ?array {
+        $progress_filename = self::progressPath($album_path, $md5_fingerprint);
         if (is_file($progress_filename . '.txt')) {
             return [file_get_contents($progress_filename . '.txt'), []];
         } elseif (is_file($progress_filename . '.json')) {
@@ -28,8 +28,8 @@ class IO {
         return null;
     }
 
-    static function updateProgress(string $base_path, string $md5_fingerprint, string $photo_remote_path, ?string $album): void {
-        $progress_filename = self::progressPath($base_path, $md5_fingerprint);
+    static function updateProgress(string $album_path, string $md5_fingerprint, string $photo_remote_path, ?string $album): void {
+        $progress_filename = self::progressPath($album_path, $md5_fingerprint);
 
         $progress = self::checkProgress($base_path, $md5_fingerprint);
         if ($progress === null) {
