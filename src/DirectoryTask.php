@@ -29,24 +29,6 @@ readonly class DirectoryTask implements Task {
         return 'failed: ' . $e->getMessage();
     }
 
-    static function attempt(\Sabre\DAV\Client $client, string $method, mixed ...$args): mixed {
-        $attempts = 0;
-        do {
-            $attempts++;
-            IO::write('attempt #' . $attempts . ' to ' . $method);
-            try {
-                return $client->$method(...$args);
-            } catch (Sabre\HTTP\ClientException $e) {
-                if ($attempts === 5) {
-                    throw $e;
-                } else {
-                    IO::write('attempt failed, retrying in 10 seconds...');
-                    sleep(10);
-                }
-            }
-        } while ($attempts < 6);
-    }
-
     #[\Override]
     public function run(Channel $channel, Cancellation $cancellation): string {
         if (is_dir($this->path . '/.migrated')) {
@@ -55,13 +37,12 @@ readonly class DirectoryTask implements Task {
             return 'skip to prevent recurring crashes, resolve errors first and delete gp2nc-error.log';
         }
 
-        $client = new \Sabre\DAV\Client([
-            'baseUri' => $this->nextcloud_url . '/remote.php/dav',
-            'userName' => $this->nextcloud_user,
-            'password' => $this->nextcloud_password,
-            'authType' => \Sabre\DAV\Client::AUTH_BASIC
-        ]);
-        $attempt = fn(string $method, mixed ...$args) => self::attempt($client, $method, ...$args);
+        $attempt = new Attempt(new \Sabre\DAV\Client([
+                    'baseUri' => $this->nextcloud_url . '/remote.php/dav',
+                    'userName' => $this->nextcloud_user,
+                    'password' => $this->nextcloud_password,
+                    'authType' => \Sabre\DAV\Client::AUTH_BASIC
+        ]));
 
         $directory_name = basename($this->path);
         $files = array_filter(glob($this->path . '/*'), 'is_file');
