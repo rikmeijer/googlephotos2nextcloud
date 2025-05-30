@@ -163,7 +163,7 @@ readonly class DirectoryTask implements Task {
 
                 $debug('Photo ' . $photo_index . ' of ' . $no_photos);
 
-                $progress = IO::checkProgress($photo_path);
+                $progress = Progress::check($photo_path);
                 if ($progress !== null) {
                     $photo_remote_path = $progress[0];
                     $photo_remote_filename = basename($photo_remote_path);
@@ -189,7 +189,6 @@ readonly class DirectoryTask implements Task {
                     $file_id = null;
                     $local_size = filesize($photo_path);
                     try {
-
                         $file_remote_props = $attempt('propFind', $directory_remote_path . '/' . $photo_remote_filename, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
                         if (count($file_remote_props) > 0) {
                             $remote_size = (int) $file_remote_props['{http://owncloud.org/ns}size'] ?? null;
@@ -241,7 +240,7 @@ readonly class DirectoryTask implements Task {
                         }
                     }
 
-                    IO::updateProgress($photo_path, $photo_remote_path, null);
+                    Progress::update($photo_path, $photo_remote_path, null);
                 }
 
                 if (isset($album_path) === false) {
@@ -256,7 +255,7 @@ readonly class DirectoryTask implements Task {
                     $attempt('request', 'COPY', $photo_remote_path, headers: [
                         'Destination' => $album_path . '/' . $photo_remote_filename
                     ]);
-                    IO::updateProgress($photo_path, $photo_remote_path, $directory_name);
+                    Progress::update($photo_path, $photo_remote_path, $directory_name);
                 }
             }
         } catch (\Exception $e) {
