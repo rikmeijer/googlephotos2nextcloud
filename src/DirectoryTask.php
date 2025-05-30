@@ -158,12 +158,11 @@ readonly class DirectoryTask implements Task {
         IO::write('Found ' . $no_photos . ' photo files');
         $progress_directory = $this->path . '/.progress';
 
-        $read_progress = fn(string $md5_fingerprint) => IO::checkProgress($this->path, $md5_fingerprint);
-        $write_progress = fn(string $md5_fingerprint, string $photo_remote_path, ?string $album) => IO::updateProgress($this->path, $md5_fingerprint, $photo_remote_path, $album);
+        $read_progress = fn(string $photo_path) => IO::checkProgress($this->path, $photo_path);
+        $write_progress = fn(string $photo_path, string $photo_remote_path, ?string $album) => IO::updateProgress($this->path, $photo_path, $photo_remote_path, $album);
 
         try {
             foreach (array_values($photo_files) as $photo_index => $photo_path) {
-                $fingerprint = md5_file($photo_path);
                 $photo_filename = basename($photo_path);
                 $debug = fn(string $message) => $directory_debug('[' . $photo_filename . '] - ' . $message);
 
@@ -172,17 +171,17 @@ readonly class DirectoryTask implements Task {
                 if (is_dir($progress_directory)) {
                     $progress_filename = $progress_directory . DIRECTORY_SEPARATOR . $photo_filename . '.txt';
                     if (is_file($progress_filename)) {
-                        $write_progress($fingerprint, file_get_contents($progress_filename), null);
+                        $write_progress($photo_path, file_get_contents($progress_filename), null);
                         unlink($progress_filename);
                         $debug('Old progress file, moved to global progress directory.');
                     }
                 }
 
-                $progress = $read_progress($fingerprint);
+                $progress = $read_progress($photo_path);
                 if ($progress !== null) {
                     $photo_remote_path = $progress[0];
                     $photo_remote_filename = basename($photo_remote_path);
-                    $debug('Already uploaded as ' . $photo_remote_path . ' - ' . $fingerprint);
+                    $debug('Already uploaded as ' . $photo_remote_path);
 
                     if (in_array($directory_name, $progress[1])) {
                         $debug('Already added to album "' . $directory_name . '"');
@@ -256,7 +255,7 @@ readonly class DirectoryTask implements Task {
                         }
                     }
 
-                    $write_progress($fingerprint, $photo_remote_path, null);
+                    $write_progress($photo_path, $photo_remote_path, null);
                 }
 
                 if (isset($album_path) === false) {
@@ -271,7 +270,7 @@ readonly class DirectoryTask implements Task {
                     $attempt('request', 'COPY', $photo_remote_path, headers: [
                         'Destination' => $album_path . '/' . $photo_remote_filename
                     ]);
-                    $write_progress($fingerprint, $photo_remote_path, $directory_name);
+                    $write_progress($photo_path, $photo_remote_path, $directory_name);
                 }
             }
         } catch (\Exception $e) {
