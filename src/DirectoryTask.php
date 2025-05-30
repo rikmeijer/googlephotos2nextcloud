@@ -156,10 +156,6 @@ readonly class DirectoryTask implements Task {
         }
 
         IO::write('Found ' . $no_photos . ' photo files');
-
-        $read_progress = fn(string $photo_path) => IO::checkProgress($photo_path);
-        $write_progress = fn(string $photo_path, string $photo_remote_path, ?string $album) => IO::updateProgress($photo_path, $photo_remote_path, $album);
-
         try {
             foreach (array_values($photo_files) as $photo_index => $photo_path) {
                 $photo_filename = basename($photo_path);
@@ -167,7 +163,7 @@ readonly class DirectoryTask implements Task {
 
                 $debug('Photo ' . $photo_index . ' of ' . $no_photos);
 
-                $progress = $read_progress($photo_path);
+                $progress = IO::checkProgress($photo_path);
                 if ($progress !== null) {
                     $photo_remote_path = $progress[0];
                     $photo_remote_filename = basename($photo_remote_path);
@@ -245,7 +241,7 @@ readonly class DirectoryTask implements Task {
                         }
                     }
 
-                    $write_progress($photo_path, $photo_remote_path, null);
+                    IO::updateProgress($photo_path, $photo_remote_path, null);
                 }
 
                 if (isset($album_path) === false) {
@@ -260,7 +256,7 @@ readonly class DirectoryTask implements Task {
                     $attempt('request', 'COPY', $photo_remote_path, headers: [
                         'Destination' => $album_path . '/' . $photo_remote_filename
                     ]);
-                    $write_progress($photo_path, $photo_remote_path, $directory_name);
+                    IO::updateProgress($photo_path, $photo_remote_path, $directory_name);
                 }
             }
         } catch (\Exception $e) {
