@@ -106,7 +106,7 @@ readonly class DirectoryTask implements Task {
                     if (isset($file_id)) {
                         $debug('Remote file already exists and same file size, skipping');
                     } else {
-                        RemoteFile::upload($photo_path, $photo_remote_path);
+                        RemoteFile::upload($attempt, $photo_path, $photo_remote_path);
                         $debug('Succesfully uploaded to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
                     }
 
