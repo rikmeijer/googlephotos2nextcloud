@@ -10,8 +10,9 @@ class Metadata {
         'exif:DateTimeDigitized'
     ];
     const EXIF_FORMATS = [
-        'Y-m-d_G:i:s' => '/\d+\-\d+\-\d+_\d+:\d+:\d+/',
-        'Y:m:d G:i:s' => '/\d+\:\d+\:\d+ \d+:\d+:\d+/'
+        'Y-m-d_G:i:s' => '/^\d+\-\d+\-\d+_\d+:\d+:\d+$/',
+        'Y:m:d G:i:s' => '/^\d+\:\d+\:\d+ \d+:\d+:\d+$/',
+        'Y:m:d G:i:s.v' => '/^\d+\:\d+\:\d+ \d+:\d+:\d+\.\d+$/'
     ];
 
     static array $cache = [];
