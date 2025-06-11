@@ -6,12 +6,12 @@ Replace NEXTCLOUD_URL with the following: https://<USER>:<APP_PASSWORD>@nextclou
 # Run from command line (in /path/to/Takout/Google Photos, where photo directories and jsons are residing)
 # Imagick extension required (with ffmpeg for video exif data)
 ```.env
-NEXTCLOUD_URL=<NEXTCLOUD_URL>
+NEXTCLOUD_URL=<NEXTCLOUD_URL> # e.g. https://user@s3cr3t:cloud.example.com/Photos
 NEXTCLOUD_USER=usernamehere # Optional, overwrites user in NEXTCLOUD_URL
 NEXTCLOUD_PASSWORD=secret # Optional, overwrites password in NEXTCLOUD_URL
 ```
 ```
-php gp2nc.php 
+$ php gp2nc.php
 ```
 
 # Run with docker
