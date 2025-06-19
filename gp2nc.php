@@ -83,16 +83,6 @@ foreach ($createable_albums as $creatable_album) {
     $client->request('MKCOL', $albums_base_path . '/' . rawurlencode($creatable_album));
 }
 
-
-$available_directory_resources = $client->propfind($files_base_path . NEXTCLOUD_UPLOAD_PATH, [
-    '{DAV:}displayname',
-    '{DAV:}getcontentlength',
-        ], 1);
-$available_directories = [];
-foreach ($available_directory_resources as $directory_id => $available_directory_resource) {
-    $available_directories[] = rawurldecode(basename($directory_id));
-}
-
 IO::write('Walking directories...');
 
 $pool = Worker\workerPool(new ContextWorkerPool());
