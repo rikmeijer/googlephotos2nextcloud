@@ -7,10 +7,7 @@ readonly class DirectoryTask {
     public function __construct(
             private string $path,
             private string $files_base_path,
-            private ?string $album_path,
-            private string $nextcloud_url,
-            private string $nextcloud_user,
-            private string $nextcloud_password
+            private ?string $album_path
     ) {
 
     }
@@ -24,19 +21,12 @@ readonly class DirectoryTask {
         return 'failed: ' . $e->getMessage();
     }
 
-    public function __invoke(): string {
+    public function __invoke(callable $attempt): string {
         if (is_dir($this->path . '/.migrated')) {
             return 'already migrated';
         } elseif (is_file($this->path . '/gp2nc-error.log')) {
             return 'skip to prevent recurring crashes, resolve errors first and delete gp2nc-error.log';
         }
-
-        $attempt = new Attempt(new \Sabre\DAV\Client([
-                    'baseUri' => $this->nextcloud_url . '/remote.php/dav',
-                    'userName' => $this->nextcloud_user,
-                    'password' => $this->nextcloud_password,
-                    'authType' => \Sabre\DAV\Client::AUTH_BASIC
-        ]));
 
         $directory_name = basename($this->path);
         $files = array_filter(glob($this->path . '/*'), 'is_file');

@@ -88,11 +88,8 @@ foreach (glob(WORKING_DIRECTORY . '/*') as $path) {
     $task = new DirectoryTask(
             $path,
             $files_base_path . NEXTCLOUD_UPLOAD_PATH,
-            in_array(basename($path), $user_albums) ? $albums_base_path . '/' . rawurlencode(basename($path)) : null,
-            NEXTCLOUD_URL,
-            NEXTCLOUD_USER,
-            NEXTCLOUD_PASSWORD
+            in_array(basename($path), $user_albums) ? $albums_base_path . '/' . rawurlencode(basename($path)) : null
     );
 
-    $task();
+    $task(new Attempt($client));
 }
