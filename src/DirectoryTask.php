@@ -5,12 +5,12 @@ namespace Rikmeijer\Googlephotos2nextcloud;
 readonly class DirectoryTask {
 
     public function __construct(
-            private callable $attempt,
+            private mixed $attempt,
             private string $files_base_path,
             private string $albums_base_path,
             private array $user_albums
     ) {
-
+        
     }
 
     static function storeException(string $path, \Exception $e): string {
