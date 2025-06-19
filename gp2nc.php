@@ -81,15 +81,17 @@ foreach ($createable_albums as $creatable_album) {
 }
 
 IO::write('Walking directories...');
+$task = new DirectoryTask(
+        new Attempt($client),
+        $files_base_path . NEXTCLOUD_UPLOAD_PATH,
+        $albums_base_path,
+        $user_albums
+);
+
 foreach (glob(WORKING_DIRECTORY . '/*') as $path) {
     if (is_dir($path) === false) {
         continue;
     }
-    $task = new DirectoryTask(
-            $path,
-            $files_base_path . NEXTCLOUD_UPLOAD_PATH,
-            in_array(basename($path), $user_albums) ? $albums_base_path . '/' . rawurlencode(basename($path)) : null
-    );
 
-    $task(new Attempt($client));
+    $task($path);
 }

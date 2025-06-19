@@ -5,9 +5,10 @@ namespace Rikmeijer\Googlephotos2nextcloud;
 readonly class DirectoryTask {
 
     public function __construct(
-            private string $path,
+            private callable $attempt,
             private string $files_base_path,
-            private ?string $album_path
+            private string $albums_base_path,
+            private array $user_albums
     ) {
 
     }
@@ -21,19 +22,22 @@ readonly class DirectoryTask {
         return 'failed: ' . $e->getMessage();
     }
 
-    public function __invoke(callable $attempt): string {
-        if (is_dir($this->path . '/.migrated')) {
+    public function __invoke(string $origin_path): string {
+        $album_path = in_array(basename($origin_path), $this->user_albums) ? $this->albums_base_path . '/' . rawurlencode(basename($origin_path)) : null;
+        $attempt = $this->attempt;
+
+        if (is_dir($origin_path . '/.migrated')) {
             return 'already migrated';
-        } elseif (is_file($this->path . '/gp2nc-error.log')) {
+        } elseif (is_file($origin_path . '/gp2nc-error.log')) {
             return 'skip to prevent recurring crashes, resolve errors first and delete gp2nc-error.log';
         }
 
-        $directory_name = basename($this->path);
-        $files = array_filter(glob($this->path . '/*'), 'is_file');
+        $directory_name = basename($origin_path);
+        $files = array_filter(glob($origin_path . '/*'), 'is_file');
         IO::write('Found "' . $directory_name . '", containing ' . count($files) . ' files');
 
-        if (isset($this->album_path)) {
-            $album_photos = $attempt('propFind', $this->album_path, [], 1);
+        if (isset($album_path)) {
+            $album_photos = $attempt('propFind', $album_path, [], 1);
             IO::write('Found album "' . $directory_name . '", containing ' . count($album_photos) . ' photos');
         }
 
@@ -98,26 +102,26 @@ readonly class DirectoryTask {
                     Progress::update($photo_path, $photo_remote_path, null);
                 }
 
-                if (isset($this->album_path) === false) {
+                if (isset($album_path) === false) {
                     continue;
                 }
 
-                $debug('Photo must be in album ' . $this->album_path);
-                if (isset($file_id, $album_photos[$this->album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
+                $debug('Photo must be in album ' . $album_path);
+                if (isset($file_id, $album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
                     $debug('Already in album "' . $directory_name . '"');
                 } else {
                     $debug('Copying to album "' . $directory_name . '"');
                     $attempt('request', 'COPY', $photo_remote_path, headers: [
-                        'Destination' => $this->album_path . '/' . $photo_remote_filename
+                        'Destination' => $album_path . '/' . $photo_remote_filename
                     ]);
                     Progress::update($photo_path, $photo_remote_path, $directory_name);
                 }
             }
         } catch (\Exception $e) {
-            return self::storeException($this->path, $e);
+            return self::storeException($origin_path, $e);
         }
 
-        mkdir($this->path . '/.migrated');
+        mkdir($origin_path . '/.migrated');
         return 'done';
     }
 }
