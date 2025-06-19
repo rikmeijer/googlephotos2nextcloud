@@ -2,11 +2,7 @@
 
 namespace Rikmeijer\Googlephotos2nextcloud;
 
-use Amp\Parallel\Worker\Task;
-use Amp\Sync\Channel;
-use Amp\Cancellation;
-
-readonly class DirectoryTask implements Task {
+readonly class DirectoryTask {
 
     public function __construct(
             private string $path,
@@ -28,8 +24,7 @@ readonly class DirectoryTask implements Task {
         return 'failed: ' . $e->getMessage();
     }
 
-    #[\Override]
-    public function run(Channel $channel, Cancellation $cancellation): string {
+    public function __invoke(): string {
         if (is_dir($this->path . '/.migrated')) {
             return 'already migrated';
         } elseif (is_file($this->path . '/gp2nc-error.log')) {

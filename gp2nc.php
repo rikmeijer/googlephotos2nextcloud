@@ -4,9 +4,6 @@ require __DIR__ . '/vendor/autoload.php';
 
 use Rikmeijer\Googlephotos2nextcloud\DirectoryTask;
 use Rikmeijer\Googlephotos2nextcloud\IO;
-use Amp\Future;
-use Amp\Parallel\Worker;
-use Amp\Parallel\Worker\ContextWorkerPool;
 
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
 $dotenv->safeLoad();
@@ -84,36 +81,18 @@ foreach ($createable_albums as $creatable_album) {
 }
 
 IO::write('Walking directories...');
-
-$pool = Worker\workerPool(new ContextWorkerPool());
-
-$executions = [];
 foreach (glob(WORKING_DIRECTORY . '/*') as $path) {
     if (is_dir($path) === false) {
         continue;
     }
+    $task = new DirectoryTask(
+            $path,
+            $files_base_path . NEXTCLOUD_UPLOAD_PATH,
+            in_array(basename($path), $user_albums) ? $albums_base_path . '/' . rawurlencode(basename($path)) : null,
+            NEXTCLOUD_URL,
+            NEXTCLOUD_USER,
+            NEXTCLOUD_PASSWORD
+    );
 
-    // FetchTask is just an example, you'll have to implement
-    // the Task interface for your task.
-    $executions[$path] = Worker\submit(new DirectoryTask(
-                    $path,
-                    $files_base_path . NEXTCLOUD_UPLOAD_PATH,
-                    in_array(basename($path), $user_albums) ? $albums_base_path . '/' . rawurlencode(basename($path)) : null,
-                    NEXTCLOUD_URL,
-                    NEXTCLOUD_USER,
-                    NEXTCLOUD_PASSWORD
-            ));
-}
-
-
-// Each submission returns an Execution instance to allow two-way
-// communication with a task. Here we're only interested in the
-// task result, so we use the Future from Execution::getFuture()
-$responses = Future\await(array_map(
-                fn(Worker\Execution $e) => $e->getFuture(),
-                $executions,
-        ));
-
-foreach ($responses as $url => $response) {
-    \printf("Read %d bytes from %s\n", \strlen($response), $url);
+    $task();
 }
