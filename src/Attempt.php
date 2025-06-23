@@ -16,7 +16,6 @@ class Attempt {
         $attempts = 0;
         do {
             $attempts++;
-            IO::write('attempt #' . $attempts . ' to ' . $method);
             try {
                 return $this->client->$method(...$args);
             } catch (Sabre\HTTP\ClientException $e) {

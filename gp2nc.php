@@ -2,6 +2,8 @@
 
 require __DIR__ . '/vendor/autoload.php';
 
+ini_set('memory_limit', '3G'); // needed when there are ALOT of files remote
+
 use Rikmeijer\Googlephotos2nextcloud\DirectoryTask;
 use Rikmeijer\Googlephotos2nextcloud\IO;
 
@@ -63,6 +65,7 @@ IO::write('Found ' . count($user_albums) . ' user albums');
 $files_base_path = '/remote.php/dav/files/' . NEXTCLOUD_USER;
 $albums_base_path = '/remote.php/dav/photos/' . NEXTCLOUD_USER . '/albums';
 
+IO::write('Retrieving remote albums...');
 $available_album_resources = $client->propfind($albums_base_path, [
     '{DAV:}displayname',
     '{DAV:}getcontentlength',
@@ -80,12 +83,40 @@ foreach ($createable_albums as $creatable_album) {
     $client->request('MKCOL', $albums_base_path . '/' . rawurlencode($creatable_album));
 }
 
+$attempt = new Rikmeijer\Googlephotos2nextcloud\Attempt($client);
+
+IO::write('Retrieving remote files...');
+$media_properties = [
+    '{DAV:}displayname',
+    '{DAV:}getcontentlength',
+    '{DAV:}getcontenttype',
+    '{DAV:}resourcetype',
+    '{http://owncloud.org/ns}checksums',
+    '{http://nextcloud.org/ns}creation_time',
+    '{http://owncloud.org/ns}fileid'
+];
+$remote_files = [];
+foreach ($attempt('propfind', $files_base_path . NEXTCLOUD_UPLOAD_PATH, $media_properties, 3) as $file_path => $available_media_file) {
+    if (isset($available_media_file['{DAV:}getcontentlength']) === false) {
+        continue;
+    }
+
+    $hash = Rikmeijer\Googlephotos2nextcloud\Hash::retrieve($attempt, $file_path, $available_media_file);
+    if (isset($remote_files[$hash])) {
+        $remote_files[$hash][$file_path] = $available_media_file;
+    } else {
+        $remote_files[$hash] = [$file_path => $available_media_file];
+    }
+}
+IO::write('Found ' . count($remote_files) . ' files remotely');
+
 IO::write('Walking directories...');
 $task = new DirectoryTask(
-        new Attempt($client),
+        $attempt,
         $files_base_path . NEXTCLOUD_UPLOAD_PATH,
         $albums_base_path,
-        $user_albums
+        $user_albums,
+        $remote_files
 );
 
 foreach (glob(WORKING_DIRECTORY . '/*') as $path) {

@@ -8,7 +8,8 @@ readonly class DirectoryTask {
             private mixed $attempt,
             private string $files_base_path,
             private string $albums_base_path,
-            private array $user_albums
+            private array $user_albums,
+            private array $remote_files
     ) {
         
     }
@@ -22,17 +23,28 @@ readonly class DirectoryTask {
         return 'failed: ' . $e->getMessage();
     }
 
+    static function filenameContainsIncrement(string $filename): bool {
+        return preg_match('/\([\w\d\s]+\)/', $filename) === 1;
+    }
+
+    static function filenamesWithouthIncrementAreIdentical(string $filename1, string $filename2): bool {
+        $filename1_without_increment = preg_replace('/\([\w\d\s]+\)/', '', $filename1);
+        $filename2_without_increment = preg_replace('/\([\w\d\s]+\)/', '', $filename2);
+        return $filename1_without_increment === $filename2_without_increment;
+    }
+
     public function __invoke(string $origin_path): string {
-        $album_path = in_array(basename($origin_path), $this->user_albums) ? $this->albums_base_path . '/' . rawurlencode(basename($origin_path)) : null;
+        $directory_name = basename($origin_path);
+
+        $album_path = in_array($directory_name, $this->user_albums) ? $this->albums_base_path . '/' . rawurlencode($directory_name) : null;
         $attempt = $this->attempt;
 
-        if (is_dir($origin_path . '/.migrated')) {
-            return 'already migrated';
-        } elseif (is_file($origin_path . '/gp2nc-error.log')) {
+        $move = RemoteFile::move($this->attempt);
+
+        if (is_file($origin_path . '/gp2nc-error.log')) {
             return 'skip to prevent recurring crashes, resolve errors first and delete gp2nc-error.log';
         }
 
-        $directory_name = basename($origin_path);
         $files = array_filter(glob($origin_path . '/*'), 'is_file');
         IO::write('Found "' . $directory_name . '", containing ' . count($files) . ' files');
 
@@ -53,75 +65,79 @@ readonly class DirectoryTask {
         IO::write('Found ' . $no_photos . ' photo files');
         try {
             foreach (array_values($photo_files) as $photo_index => $photo_path) {
-                $debug = fn(string $message) => IO::write('[' . basename($photo_path) . '] - ' . $message);
+                $local_filename = basename($photo_path);
+                $debug = fn(string $message) => IO::write('[' . $local_filename . '] - ' . $message);
+                $local_hash = md5_file($photo_path);
 
                 $debug('Photo ' . $photo_index . ' of ' . $no_photos);
 
-                $progress = Progress::check($photo_path);
-                if ($progress !== null) {
-                    $photo_remote_path = $progress[0];
-                    $photo_remote_filename = basename($photo_remote_path);
-                    $debug('Already uploaded as ' . $photo_remote_path);
+                if (isset($this->remote_files[$local_hash])) {
+                    $debug('Same file already exists remotely as: ');
+                    foreach ($this->remote_files[$local_hash] as $remote_duplicate_path => $remote_duplicate) {
+                        $debug('-> ' . $remote_duplicate_path);
+                        $remote_duplicate_filename = basename(urldecode($remote_duplicate_path));
 
-                    if (in_array($directory_name, $progress[1])) {
-                        $debug('Already added to album "' . $directory_name . '"');
-                        continue;
-                    }
-                } else {
-                    $debug('Photo or video taken @ ' . Metadata::takenTime($photo_path)->format('Y-m-d H:i:s'));
-
-                    $directory_remote_path = RemoteDirectory::create($attempt, $this->files_base_path, Metadata::takenTime($photo_path)->format('/Y/m'));
-
-                    $photo_remote_filename = rawurlencode(basename($photo_path));
-                    $file_id = null;
-                    try {
-                        $file_remote_props = $attempt('propFind', $directory_remote_path . '/' . $photo_remote_filename, ['{http://owncloud.org/ns}fileid', '{http://owncloud.org/ns}size']);
-                        if (isset($file_remote_props['{http://owncloud.org/ns}size']) === false) {
-                            
-                        } elseif ((int) $file_remote_props['{http://owncloud.org/ns}size'] === 0) {
-
-                        } elseif (filesize($photo_path) === (int) $file_remote_props['{http://owncloud.org/ns}size']) {
-                            $file_id = $file_remote_props['{http://owncloud.org/ns}fileid'];
+                        if ($local_filename === $remote_duplicate_filename) {
+                            $debug('Identical filename, already uploaded');
+                        } elseif (self::filenameContainsIncrement($local_filename)) {
+                            $debug('Local file name contains file incrementer, e.g.: (1)');
+                        } elseif (self::filenameContainsIncrement($remote_duplicate_filename) === false) {
+                            $debug('Remote file name does not contain file incrementer, e.g.: (1)');
+                        } elseif (self::filenamesWithouthIncrementAreIdentical($local_filename, $remote_duplicate_filename)) {
+                            $debug('Locally there is no incrementer, remotely there is. Without the incrementer, files are identical');
                         } else {
-                            $debug('Rename remote target, because existing remote file has same name but different, non-zero filesize (so possibly a different photo)');
-                            $photo_remote_filename = uniqid() . '-' . $photo_remote_filename;
+                            $existsTest = RemoteFile::existsTest($attempt, dirname($remote_duplicate_path), [
+                                    '{DAV:}displayname',
+                                    '{DAV:}getcontentlength',
+                                    '{DAV:}getcontenttype',
+                                    '{DAV:}resourcetype',
+                                    '{http://owncloud.org/ns}checksums',
+                                    '{http://nextcloud.org/ns}creation_time',
+                                    '{http://owncloud.org/ns}fileid'
+                            ]);
+
+                            $available_filename = \Rikmeijer\NCMediaCleaner\RemoteFile::findAvailable($existsTest, $local_filename);
+                            $move($remote_duplicate_path, dirname($remote_duplicate_path) . '/' . urlencode($available_filename));
                         }
-                    } catch (\Sabre\HTTP\ClientHttpException $exception) {
-                        
+
+                        if (isset($album_path)) {
+                            $album_identifier_path = $album_path . '/' . $remote_duplicate['{http://owncloud.org/ns}fileid'] . '-' . $remote_duplicate_filename;
+                            $debug('Photo must be in album ' . $album_path);
+                            if (isset($album_photos[$album_identifier_path]) === false) {
+                                $attempt('request', 'COPY', $remote_duplicate_path, headers: [
+                                    'Destination' => $album_path . '/' . $remote_duplicate_filename
+                                ]);
+                                $album_photos[$album_identifier_path] = [];
+                                $debug('Copied');
+                            }
+                        }
+
                     }
-
-                    $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
-
-                    if (isset($file_id)) {
-                        $debug('Remote file already exists and same file size, skipping');
-                    } else {
-                        RemoteFile::upload($attempt, $photo_path, $photo_remote_path);
-                        $debug('Succesfully uploaded to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
-                    }
-
-                    Progress::update($photo_path, $photo_remote_path, null);
-                }
-
-                if (isset($album_path) === false) {
                     continue;
                 }
 
-                $debug('Photo must be in album ' . $album_path);
-                if (isset($file_id, $album_photos[$album_path . '/' . $file_id . '-' . $photo_remote_filename])) {
-                    $debug('Already in album "' . $directory_name . '"');
-                } else {
+                $debug('Photo or video taken @ ' . Metadata::takenTime($photo_path)->format('Y-m-d H:i:s'));
+
+                $directory_remote_path = RemoteDirectory::create($attempt, $this->files_base_path, Metadata::takenTime($photo_path)->format('/Y/m'));
+
+                $photo_remote_filename = rawurlencode($local_filename);
+
+                $photo_remote_path = $directory_remote_path . '/' . $photo_remote_filename;
+
+                RemoteFile::upload($attempt, $photo_path, $photo_remote_path);
+                $debug('Succesfully uploaded to "' . str_replace($this->files_base_path, '', $photo_remote_path) . '"');
+
+                if (isset($album_path)) {
                     $debug('Copying to album "' . $directory_name . '"');
                     $attempt('request', 'COPY', $photo_remote_path, headers: [
                         'Destination' => $album_path . '/' . $photo_remote_filename
                     ]);
-                    Progress::update($photo_path, $photo_remote_path, $directory_name);
                 }
             }
         } catch (\Exception $e) {
             return self::storeException($origin_path, $e);
         }
 
-        mkdir($origin_path . '/.migrated');
         return 'done';
     }
 }
