@@ -96,7 +96,7 @@ readonly class DirectoryTask {
                                     '{http://owncloud.org/ns}fileid'
                             ]);
 
-                            $available_filename = \Rikmeijer\NCMediaCleaner\RemoteFile::findAvailable($existsTest, $local_filename);
+                            $available_filename = RemoteFile::findAvailable($existsTest, $local_filename);
                             $move($remote_duplicate_path, dirname($remote_duplicate_path) . '/' . urlencode($available_filename));
                             $debug('Remote has a very different filename, but contents are identical. Renamed remote file (' . $remote_duplicate_filename . '-->' . $available_filename . ')');
                         }
