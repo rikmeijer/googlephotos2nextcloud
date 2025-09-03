@@ -25,7 +25,7 @@ $origin = [$parsed_url['scheme'] . '://', $parsed_url['host']];
 if (isset($parsed_url['port'])) {
     $origin[] = $parsed_url['port'];
 }
-define('NEXTCLOUD_URL', implode($origin));
+define('NEXTCLOUD_URL', implode($origin) . '/');
 IO::write('Working on ' . NEXTCLOUD_URL);
 
 define('NEXTCLOUD_USER', $_ENV['NEXTCLOUD_USER'] ?? $parsed_url['user'] ?? null);
@@ -41,9 +41,12 @@ if (NEXTCLOUD_PASSWORD !== null) {
 define('NEXTCLOUD_UPLOAD_PATH', $parsed_url['path']);
 
 $client = new Sabre\DAV\Client([
-    'baseUri' => NEXTCLOUD_URL . '/remote.php/dav',
+    'driver' => 'webdav',
+    'baseUri' => NEXTCLOUD_URL,
     'userName' => NEXTCLOUD_USER,
     'password' => NEXTCLOUD_PASSWORD
+    'pathPrefix' => 'remote.php/dav',
+    'authType' => 1, //Basic authentication
         ]);
 
 
