@@ -44,7 +44,7 @@ $client = new Sabre\DAV\Client([
     'driver' => 'webdav',
     'baseUri' => NEXTCLOUD_URL,
     'userName' => NEXTCLOUD_USER,
-    'password' => NEXTCLOUD_PASSWORD
+    'password' => NEXTCLOUD_PASSWORD,
     'pathPrefix' => 'remote.php/dav',
     'authType' => 1, //Basic authentication
         ]);
