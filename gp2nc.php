@@ -28,6 +28,13 @@ if (isset($parsed_url['port'])) {
 define('NEXTCLOUD_URL', implode($origin) . '/');
 IO::write('Working on ' . NEXTCLOUD_URL);
 
+if (isset($_ENV['NEXTCLOUD_PREFIX'])) {
+  define('NEXTCLOUD_PREFIX', $_ENV['NEXTCLOUD_PREFIX'] . '/remote.php/dav');
+  IO::write('Path prefix ' . $_ENV['NEXTCLOUD_PREFIX']);
+} else {
+  define('NEXTCLOUD_PREFIX', 'remote.php/dav');
+}
+
 define('NEXTCLOUD_USER', $_ENV['NEXTCLOUD_USER'] ?? $parsed_url['user'] ?? null);
 IO::write('Identifing as ' . NEXTCLOUD_USER ?? 'anonymous');
 
@@ -45,7 +52,7 @@ $client = new Sabre\DAV\Client([
     'baseUri' => NEXTCLOUD_URL,
     'userName' => NEXTCLOUD_USER,
     'password' => NEXTCLOUD_PASSWORD,
-    'pathPrefix' => 'remote.php/dav',
+    'pathPrefix' => NEXTCLOUD_PREFIX,
     'authType' => 1, //Basic authentication
         ]);
 
@@ -65,8 +72,8 @@ foreach ($user_albums_metadata_files as $user_albums_metadata_file) {
 }
 IO::write('Found ' . count($user_albums) . ' user albums');
 
-$files_base_path = '/remote.php/dav/files/' . NEXTCLOUD_USER;
-$albums_base_path = '/remote.php/dav/photos/' . NEXTCLOUD_USER . '/albums';
+$files_base_path = '/' . NEXTCLOUD_PREFIX .'/files/' . NEXTCLOUD_USER;
+$albums_base_path = '/' . NEXTCLOUD_PREFIX .'/photos/' . NEXTCLOUD_USER . '/albums';
 
 IO::write('Retrieving remote albums...');
 $available_album_resources = $client->propfind($albums_base_path, [
