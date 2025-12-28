@@ -2,6 +2,9 @@ Requires Nextcloud Photos app to be installed, because of albums.
 
 Replace NEXTCLOUD_URL with the following: https://<USER>:<APP_PASSWORD>@nextcloud.example.org/Photos
 --> /Photos can be any path in Nextcloud to import photos to
+Optionally, setting a NEXTCLOUD_PREFIX allows nextcloud to be in a sub dir.
+# nextcloud url: https://web.hos.st/nextcloud
+NEXTCLOUD_PREFIX=nextcloud # no leading or trailing /!
 
 # Run from command line (in /path/to/Takout/Google Photos, where photo directories and jsons are residing)
 # Imagick extension required (with ffmpeg for video exif data)
