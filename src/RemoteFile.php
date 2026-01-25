@@ -7,8 +7,11 @@ class RemoteFile {
 
     static function upload(callable $attempt, string $source, string $target): bool {
         $local_size = filesize($source);
+        
+        // Read file content into memory to avoid stream rewind issues
+        $file_content = file_get_contents($source);
 
-        $response = $attempt('request', 'PUT', $target, fopen($source, 'r+'), [
+        $response = $attempt('request', 'PUT', $target, $file_content, [
             'X-OC-MTime' => filemtime($source),
             'X-OC-CTime' => Metadata::takenTime($source)->getTimestamp(),
             'OC-Total-Length' => $local_size
