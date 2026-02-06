@@ -7,12 +7,23 @@ class RemoteFile {
 
     static function upload(callable $attempt, string $source, string $target): bool {
         $local_size = filesize($source);
+        
+        // Use streaming with rewind fix
+        $file_handle = fopen($source, 'rb');
+        if ($file_handle === false) {
+            throw new \Exception('Could not open source file');
+        }
+        
+        // Ensure we're at the beginning of the file
+        rewind($file_handle);
 
-        $response = $attempt('request', 'PUT', $target, fopen($source, 'r+'), [
+        $response = $attempt('request', 'PUT', $target, $file_handle, [
             'X-OC-MTime' => filemtime($source),
             'X-OC-CTime' => Metadata::takenTime($source)->getTimestamp(),
             'OC-Total-Length' => $local_size
         ]);
+        
+        fclose($file_handle);
 
         if ($response['statusCode'] < 200 || $response['statusCode'] > 399) {
             throw new \Exception('Upload failed, invalid response code (' . $response['statusCode'] . ') received');
