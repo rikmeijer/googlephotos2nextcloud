@@ -8,6 +8,10 @@ class RemoteFile {
     static function upload(callable $attempt, string $source, string $target): bool {
         $local_size = filesize($source);
         
+        $mtime = filemtime($source);
+        // resolve BEFORE opening stream
+        $ctime = Metadata::takenTime($source)->getTimestamp();
+
         // Use streaming with rewind fix
         $file_handle = fopen($source, 'rb');
         if ($file_handle === false) {
@@ -18,8 +22,8 @@ class RemoteFile {
         rewind($file_handle);
 
         $response = $attempt('request', 'PUT', $target, $file_handle, [
-            'X-OC-MTime' => filemtime($source),
-            'X-OC-CTime' => Metadata::takenTime($source)->getTimestamp(),
+            'X-OC-MTime' => $mtime,
+            'X-OC-CTime' => $ctime,
             'OC-Total-Length' => $local_size
         ]);
         
