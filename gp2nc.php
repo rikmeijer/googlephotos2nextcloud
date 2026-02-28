@@ -23,7 +23,7 @@ $parsed_url = parse_url($_ENV['NEXTCLOUD_URL']);
 
 $origin = [$parsed_url['scheme'] . '://', $parsed_url['host']];
 if (isset($parsed_url['port'])) {
-    $origin[] = $parsed_url['port'];
+    $origin[] = ':' . $parsed_url['port'];
 }
 define('NEXTCLOUD_URL', implode($origin) . '/');
 IO::write('Working on ' . NEXTCLOUD_URL);
