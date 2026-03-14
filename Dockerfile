@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1.7
-
 FROM composer:2.9 AS composer
 FROM php:8.4-cli
 
