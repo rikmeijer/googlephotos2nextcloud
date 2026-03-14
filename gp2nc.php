@@ -136,3 +136,4 @@ foreach (glob(WORKING_DIRECTORY . '/*') as $path) {
 
     $task($path);
 }
+IO::write('Done!');
