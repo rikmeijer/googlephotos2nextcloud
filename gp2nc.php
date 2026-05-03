@@ -23,7 +23,7 @@ $parsed_url = parse_url($_ENV['NEXTCLOUD_URL']);
 
 $origin = [$parsed_url['scheme'] . '://', $parsed_url['host']];
 if (isset($parsed_url['port'])) {
-    $origin[] = $parsed_url['port'];
+    $origin[] = ':' . $parsed_url['port'];
 }
 define('NEXTCLOUD_URL', implode($origin) . '/');
 IO::write('Working on ' . NEXTCLOUD_URL);
@@ -68,7 +68,7 @@ foreach ($user_albums_metadata_files as $user_albums_metadata_file) {
     if (isset($user_album_metadata['title']) === false) {
         continue;
     } elseif (empty($user_album_metadata['title']) === false) {
-        $user_albums[] = $user_album_metadata['title'];
+        $user_albums[] = str_replace('/', '-', $user_album_metadata['title']);
     } else {
         $user_albums[] = $user_album_name;
     }

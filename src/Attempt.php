@@ -18,7 +18,7 @@ class Attempt {
             $attempts++;
             try {
                 return $this->client->$method(...$args);
-            } catch (Sabre\HTTP\ClientException $e) {
+            } catch (\Sabre\HTTP\ClientException $e) {
                 if ($attempts === 5) {
                     throw $e;
                 } else {
