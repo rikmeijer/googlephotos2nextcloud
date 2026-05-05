@@ -38,6 +38,17 @@ class Metadata {
             }
         }
 
+        if (count($options) === 0 && strtolower($ext) === 'mp4') {
+            // Live Photo: MP4 motion clip shares metadata with its HEIC/JPG companion
+            foreach (['HEIC', 'heic', 'JPG', 'jpg', 'JPEG', 'jpeg'] as $companion_ext) {
+                $companion_options = glob($basename . '.' . $companion_ext . '*.json') ?: [];
+                if (count($companion_options) > 0) {
+                    $options = $companion_options;
+                    break;
+                }
+            }
+        }
+
         if (count($options) === 0) {
             IO::write('[' . $filename_for_logging . '] - ' . 'No metadata files found');
             return null;

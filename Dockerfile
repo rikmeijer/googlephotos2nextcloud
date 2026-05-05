@@ -17,5 +17,6 @@ COPY --from=composer /usr/bin/composer /usr/bin/composer
 RUN ["composer", "--no-dev", "install"]
 
 WORKDIR "/photos"
-ENTRYPOINT [ "php", "/app/gp2nc.php" ]
+ENTRYPOINT [ "php" ]
+CMD [ "/app/gp2nc.php" ]
 
