@@ -19,7 +19,7 @@ class Hash {
         $file = $attempt('request', 'HEAD', $file_path, headers: [
             'X-Hash' => 'md5'
         ]);
-        foreach ($file['headers']['oc-checksum'] as $checksum) {
+        foreach ($file['headers']['oc-checksum'] ?? [] as $checksum) {
             list($algo, $hash) = explode(':', $checksum, 2);
             if (strcasecmp($algo, 'md5') === 0) {
                 return $hash;

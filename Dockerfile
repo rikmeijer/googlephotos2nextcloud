@@ -24,4 +24,6 @@ COPY src src
 COPY gp2nc.php ./
 
 WORKDIR "/photos"
-ENTRYPOINT [ "php", "/app/gp2nc.php" ]
+ENTRYPOINT [ "php" ]
+CMD [ "/app/gp2nc.php" ]
+
